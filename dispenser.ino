@@ -39,6 +39,7 @@ NexButton btnReles = NexButton(0, 3, "btnReles");
 NexButton btnShampoo = NexButton(0, 1, "bt0");
 NexButton btnTreatment = NexButton(0, 2, "bt1");
 NexButton btnWifi = NexButton(0, 5, "btWifi");
+NexButton btnCadastro = NexButton(0, 4, "btnCadastro");
 
 // page1
 NexDSButton btRegenerant = NexDSButton(1, 5, "bt1");
@@ -105,14 +106,14 @@ NexText txtMsgAt = NexText(6, 39, "txtMsg");
 
 NexButton btnAtualizar = NexButton(7, 14, "btnAtualizar"); //Por algum motivo, usar 6 nao funciona. Funcionou com 7.
 
-// page7
+// page7 cadastro de usuarios
 NexText cadastroOutput = NexText(8, 3, "t1"); //Funcionou com 8.
 NexText nomeProfissional = NexText(8, 9, "t6");
 NexText senhaProfissional = NexText(8, 8, "t5");
 NexText confirmaSenha = NexText(8, 10, "t7");
 NexButton btnCadastrar = NexButton(8, 4, "btnCadastrar");
 
-//page8
+//page8 conexao com a internet
 //NexText txtRede = NexText(9, 4, "txtRede"); //Funcionou com 9.
 NexComboBox comboRede = NexComboBox(9, 11, "txtRede");
 NexText txtSenha = NexText(9, 4, "txtSenha");
@@ -122,14 +123,20 @@ NexButton btnConectar = NexButton(9, 6, "btnConectar");
 NexText txtIP = NexText(9, 8, "txtIP");
 NexButton btnGravar = NexButton(9, 10, "btnGravar");
 
-//page9
+//page9 popup p/ liberar produtos
 NexText txtComanda = NexText(11, 3, "txtComanda");
 NexText txtPassword = NexText(11, 4, "txtSenha");
 NexText txtMsg = NexText(11, 9, "txtMsg");
 NexButton btnIniciar = NexButton(11, 6, "btnIniciar");
 NexButton btnFechar = NexButton(11, 7, "b1");
 
-// outras paginas
+//page10 popup paginas gerenciamento
+NexText txtSenhaGerenciar  = NexText(12, 2, "txtSenha");
+NexText txtMsgGerenciar  = NexText(12, 6, "txtMsg");
+NexButton btnProximo = NexButton(12, 4, "btnProximo");
+NexButton btnFecharGerenciar = NexButton(12, 5, "b1");
+
+// paginas
 NexPage page0 = NexPage(0, 0, "page0");
 NexPage page1 = NexPage(1, 0, "page1");
 NexPage page2 = NexPage(2, 0, "page2");
@@ -138,13 +145,15 @@ NexPage page5 = NexPage(5, 0, "page5");
 NexPage page11 = NexPage(11, 0, "page9");
 NexPage page7 = NexPage(7, 0, "page6");
 NexPage page9 = NexPage(9, 0, "page8");
+NexPage page12 = NexPage(12, 0, "page10");
+NexPage page8 = NexPage(8, 0, "page7");
 
 
 //variaveis shampoo
 enum shampoo {REGENERANT, NUTRITION, ANTIFRISO, BIONEUTRAL, NENHUM};
 shampoo opcaoShampoo;
 
-enum funcionalidade {SHAMPOO, TRATAMENTO};
+enum funcionalidade {SHAMPOO, TRATAMENTO, RELES, CADASTRO};
 funcionalidade opcao;
 
 //variaveis condicionador
@@ -459,9 +468,34 @@ void btMixTrPushCallback(void *ptr) {
   page11.show();
 }
 
+void btnProximoPopCallback(void *ptr) {
+  //TODO validar senha
+  char buffSenha[11] = {0};
+  txtSenha.getText(buffSenha, sizeof(buffSenha));
+  String strSenha(buffSenha);
+
+  if (strSenha == NULL || strSenha.equals("")) {
+    txtMsgGerenciar.setText("Senha obrigatoria");
+    return;
+  }
+
+  if (procurarSenha(strSenha)) {
+    resetarPopupSenha();
+    if (opcao == RELES) {
+      page7.show();
+      mostrarConfiguracaoValvulas();
+    }
+    else if (opcao == CADASTRO)
+      page8.show();
+  } else {
+    txtMsgGerenciar.setText("Senha nao encontrada");
+  }  
+}
+
 void btnRelesPopCallback(void *ptr) {
-  page7.show();
-  mostrarConfiguracaoValvulas();
+  resetarPopupSenha();
+  opcao = RELES;
+  page12.show();
 }
 
 void btnAtualizarPushCallback(void *ptr) {
@@ -1263,6 +1297,17 @@ void btnTreatmentPushCallback(void *ptr) {
 void resetarPopupSenha() {
   txtComanda.setText("");
   txtPassword.setText("");
+  txtSenhaGerenciar.setText("");
+}
+
+void btnFecharGerenciarPopCallback(void *ptr) {
+  page0.show();
+}
+
+void btnCadastroPopCallback(void *ptr) {
+  resetarPopupSenha();
+  opcao = CADASTRO;
+  page12.show();
 }
 
 void btnFecharPopCallback(void *ptr) {
@@ -1529,29 +1574,30 @@ NexTouch *nex_listen_list[] = {
   &btnRele16At,
   &btPhotoactiveSh,
   &btPhotoactiveTr,
+  &btnProximo,
+  &btnFecharGerenciar,
+  &btnCadastro,
   NULL
 };
 
 void setup() {
   Serial.begin(9600);
-  /*
-    nexInit();
+  
+  nexInit();
 
-    definirSaidas();
-    resetarReles();
-    resetarRelesTratamento();
-    resetarVariaveisShampoo();
-    resetarVariaveisTratamento();
-    //inicializarEeprom();
-    lerConfiguracaoValvulas();
-    initSdCard();
-    initRTC();
-    desconectarWifi(); //modulo conecta na ultima rede assim que ligado
-    lerIpComputadorRemoto();
+  definirSaidas();
+  resetarReles();
+  resetarRelesTratamento();
+  resetarVariaveisShampoo();
+  resetarVariaveisTratamento();
+  //inicializarEeprom();
+  lerConfiguracaoValvulas();
+  initSdCard();
+  initRTC();
+  desconectarWifi(); //modulo conecta na ultima rede assim que ligado
+  lerIpComputadorRemoto();
 
-    iniciarWifi();
-  */
-  conectarWifi("Everton 1", "adv15031");
+  iniciarWifi();
 
   btnReles.attachPop(btnRelesPopCallback);
   btnCadastrar.attachPush(btnCadastrarPushCallback, &btnCadastrar);
@@ -1588,8 +1634,10 @@ void setup() {
   btnShampoo.attachPush(btnShampooPushCallback, &btnShampoo);
   btnTreatment.attachPush(btnTreatmentPushCallback, &btnTreatment);
   btnFechar.attachPop(btnFecharPopCallback);
+  btnFecharGerenciar.attachPop(btnFecharGerenciarPopCallback);
   btnWifi.attachPop(btnWifiPopCallback);
   btnGravar.attachPop(btnGravarPopCallback);
+  btnProximo.attachPop(btnProximoPopCallback);
   btnRele1At.attachPop(btnRele1AtPopCallback);
   btnRele2At.attachPop(btnRele2AtPopCallback);
   btnRele3At.attachPop(btnRele3AtPopCallback);
@@ -1602,6 +1650,8 @@ void setup() {
   btnRele14At.attachPop(btnRele14AtPopCallback);
   btnRele15At.attachPop(btnRele15AtPopCallback);
   btnRele16At.attachPop(btnRele16AtPopCallback);
+
+  btnCadastro.attachPop(btnCadastroPopCallback);
 }
 
 void loop() {
