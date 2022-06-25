@@ -148,7 +148,6 @@ NexPage page9 = NexPage(9, 0, "page8");
 NexPage page12 = NexPage(12, 0, "page10");
 NexPage page8 = NexPage(8, 0, "page7");
 
-
 //variaveis shampoo
 enum shampoo {REGENERANT, NUTRITION, ANTIFRISO, BIONEUTRAL, NENHUM};
 shampoo opcaoShampoo;
@@ -492,7 +491,7 @@ void btnProximoPopCallback(void *ptr) {
   }  
 }
 
-void btnRelesPopCallback(void *ptr) {
+void btnRelesPushCallback(void *ptr) {
   resetarPopupSenha();
   opcao = RELES;
   page12.show();
@@ -1304,7 +1303,7 @@ void btnFecharGerenciarPopCallback(void *ptr) {
   page0.show();
 }
 
-void btnCadastroPopCallback(void *ptr) {
+void btnCadastroPushCallback(void *ptr) {
   resetarPopupSenha();
   opcao = CADASTRO;
   page12.show();
@@ -1599,7 +1598,7 @@ void setup() {
 
   iniciarWifi();
 
-  btnReles.attachPop(btnRelesPopCallback);
+  btnReles.attachPush(btnRelesPushCallback, &btnReles);
   btnCadastrar.attachPush(btnCadastrarPushCallback, &btnCadastrar);
   btnAtualizar.attachPush(btnAtualizarPushCallback, &btnAtualizar);
   btnConectar.attachPush(btnConectarPushCallback, &btnConectar);
@@ -1651,7 +1650,7 @@ void setup() {
   btnRele15At.attachPop(btnRele15AtPopCallback);
   btnRele16At.attachPop(btnRele16AtPopCallback);
 
-  btnCadastro.attachPop(btnCadastroPopCallback);
+  btnCadastro.attachPush(btnCadastroPushCallback, &btnCadastro);
 }
 
 void loop() {
