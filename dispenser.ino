@@ -107,11 +107,11 @@ NexText txtMsgAt = NexText(6, 39, "txtMsg");
 NexButton btnAtualizar = NexButton(7, 14, "btnAtualizar"); //Por algum motivo, usar 6 nao funciona. Funcionou com 7.
 
 // page7 cadastro de usuarios
-NexText cadastroOutput = NexText(8, 3, "t1"); //Funcionou com 8.
+NexText cadastroOutput = NexText(8, 16, "t8"); //Funcionou com 8.
 NexText nomeProfissional = NexText(8, 9, "t6");
 NexText senhaProfissional = NexText(8, 8, "t5");
 NexText confirmaSenha = NexText(8, 10, "t7");
-NexButton btnCadastrar = NexButton(8, 4, "btnCadastrar");
+NexButton btnCadastrar = NexButton(8, 3, "btnCadastrar");
 NexCheckbox cProfissional = NexCheckbox(8, 14, "c2");
 NexCheckbox cGerente = NexCheckbox(8, 11, "c0");
 NexCheckbox cTecnico = NexCheckbox(8, 12, "c1");
@@ -186,9 +186,9 @@ String profissional = "";
 String numeroComanda = "";
 
 //=======================BDs====================
-const String BDPROFISSIONAIS = "profissionais.txt";
-const String BDGERENTES = "gerentes.txt";
-const String BDTECNICOS = "tecnicos.txt";
+const String BDPROFISSIONAIS = "PRO.TXT";
+const String BDGERENTES = "GER.TXT";
+const String BDTECNICOS = "TEC.TXT";
 
 void btPhotoactiveTrPushCallback(void *ptr) {
   photoactive = !photoactive;
@@ -489,6 +489,7 @@ void btnProximoPopCallback(void *ptr) {
 
   if (opcao == RELES) {
     if (procurarSenha(strSenha, BDTECNICOS)) {
+      resetarPopupSenha();
       page7.show();
       mostrarConfiguracaoValvulas();
     }else {
@@ -496,6 +497,7 @@ void btnProximoPopCallback(void *ptr) {
     }
   }else if(opcao == CADASTRO){
     if (procurarSenha(strSenha, BDGERENTES)) {
+      resetarPopupSenha();
       page8.show();
     }else {
       txtMsgGerenciar.setText("Senha nao encontrada");
@@ -514,7 +516,7 @@ void btnAtualizarPushCallback(void *ptr) {
   gotoPage0();
 }
 
-void btnCadastrarPushCallback(void *ptr) {
+void btnCadastrarPopCallback(void *ptr) {
   cadastroOutput.Set_font_color_pco(63488);
   char buffNome[31] = {0};
   nomeProfissional.getText(buffNome, sizeof(buffNome));
@@ -550,7 +552,6 @@ void btnCadastrarPushCallback(void *ptr) {
   cGerente.getValue(&iGerente);
   cTecnico.getValue(&iTecnico);
 
-  Serial.print(F("1"));
   if(iProfissional == 0 && iGerente == 0 && iTecnico == 0){
     cadastroOutput.setText("Escolha ao menos um perfil");
     return;
@@ -561,26 +562,25 @@ void btnCadastrarPushCallback(void *ptr) {
       cadastroOutput.setText("Senha invalida.");
       return;
     }
-  Serial.print(F("2"));
   if(iTecnico == 1)
     if (procurarSenha(strSenhaProfissional, BDTECNICOS)) {
       cadastroOutput.setText("Senha invalida.");
       return;
     }
-Serial.print(F("3"));
   if(iGerente == 1)
     if (procurarSenha(strSenhaProfissional, BDGERENTES)) {
       cadastroOutput.setText("Senha invalida.");
       return;
     }
-Serial.print(F("4"));
   cadastrarProfissional(strNomeProfissional + ";" + strSenhaProfissional + "\n");
-  Serial.print(F("5"));
   cadastroOutput.Set_font_color_pco(1024);
   cadastroOutput.setText("Profissional cadastrado(a)");
   nomeProfissional.setText("");
   senhaProfissional.setText("");
   confirmaSenha.setText("");
+  cProfissional.setValue(0);
+  cGerente.setValue(0);
+  cTecnico.setValue(0);
 }
 
 bool procurarSenha(String password, String filename) {
@@ -1358,6 +1358,7 @@ void resetarPopupSenha() {
 }
 
 void btnFecharGerenciarPopCallback(void *ptr) {
+  resetarPopupSenha();
   page0.show();
 }
 
@@ -1657,7 +1658,7 @@ void setup() {
   iniciarWifi();
 
   btnReles.attachPush(btnRelesPushCallback, &btnReles);
-  btnCadastrar.attachPush(btnCadastrarPushCallback, &btnCadastrar);
+  btnCadastrar.attachPop(btnCadastrarPopCallback);
   btnAtualizar.attachPush(btnAtualizarPushCallback, &btnAtualizar);
   btnConectar.attachPush(btnConectarPushCallback, &btnConectar);
 
