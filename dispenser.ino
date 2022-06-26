@@ -112,6 +112,9 @@ NexText nomeProfissional = NexText(8, 9, "t6");
 NexText senhaProfissional = NexText(8, 8, "t5");
 NexText confirmaSenha = NexText(8, 10, "t7");
 NexButton btnCadastrar = NexButton(8, 4, "btnCadastrar");
+NexCheckbox cProfissional = NexCheckbox(8, 14, "c2");
+NexCheckbox cGerente = NexCheckbox(8, 11, "c0");
+NexCheckbox cTecnico = NexCheckbox(8, 12, "c1");
 
 //page8 conexao com a internet
 //NexText txtRede = NexText(9, 4, "txtRede"); //Funcionou com 9.
@@ -181,6 +184,11 @@ uint32_t port = 9007;
 //=======================================
 String profissional = "";
 String numeroComanda = "";
+
+//=======================BDs====================
+const String BDPROFISSIONAIS = "profissionais.txt";
+const String BDGERENTES = "gerentes.txt";
+const String BDTECNICOS = "tecnicos.txt";
 
 void btPhotoactiveTrPushCallback(void *ptr) {
   photoactive = !photoactive;
@@ -282,6 +290,8 @@ void rodaShampoo() {
     case BIONEUTRAL:
       rele = RELE4_BIONEUTRAL;
       volShampoo = (unsigned long)volume * K_valvula_11;
+      break;
+    case NENHUM:
       break;
   }
 
@@ -468,7 +478,6 @@ void btMixTrPushCallback(void *ptr) {
 }
 
 void btnProximoPopCallback(void *ptr) {
-  //TODO validar senha
   char buffSenha[11] = {0};
   txtSenha.getText(buffSenha, sizeof(buffSenha));
   String strSenha(buffSenha);
@@ -478,17 +487,20 @@ void btnProximoPopCallback(void *ptr) {
     return;
   }
 
-  if (procurarSenha(strSenha)) {
-    resetarPopupSenha();
-    if (opcao == RELES) {
+  if (opcao == RELES) {
+    if (procurarSenha(strSenha, BDTECNICOS)) {
       page7.show();
       mostrarConfiguracaoValvulas();
+    }else {
+      txtMsgGerenciar.setText("Senha nao encontrada");
     }
-    else if (opcao == CADASTRO)
+  }else if(opcao == CADASTRO){
+    if (procurarSenha(strSenha, BDGERENTES)) {
       page8.show();
-  } else {
-    txtMsgGerenciar.setText("Senha nao encontrada");
-  }  
+    }else {
+      txtMsgGerenciar.setText("Senha nao encontrada");
+    }
+  }
 }
 
 void btnRelesPushCallback(void *ptr) {
@@ -530,12 +542,40 @@ void btnCadastrarPushCallback(void *ptr) {
     return;
   }
 
-  if (procurarSenha(strSenhaProfissional)) {
-    cadastroOutput.setText("Senha invalida.");
+  uint32_t iProfissional;
+  uint32_t iGerente;
+  uint32_t iTecnico;
+
+  cProfissional.getValue(&iProfissional);
+  cGerente.getValue(&iGerente);
+  cTecnico.getValue(&iTecnico);
+
+  Serial.print(F("1"));
+  if(iProfissional == 0 && iGerente == 0 && iTecnico == 0){
+    cadastroOutput.setText("Escolha ao menos um perfil");
     return;
   }
-
+ 
+  if(iProfissional == 1)
+    if (procurarSenha(strSenhaProfissional, BDPROFISSIONAIS)) {
+      cadastroOutput.setText("Senha invalida.");
+      return;
+    }
+  Serial.print(F("2"));
+  if(iTecnico == 1)
+    if (procurarSenha(strSenhaProfissional, BDTECNICOS)) {
+      cadastroOutput.setText("Senha invalida.");
+      return;
+    }
+Serial.print(F("3"));
+  if(iGerente == 1)
+    if (procurarSenha(strSenhaProfissional, BDGERENTES)) {
+      cadastroOutput.setText("Senha invalida.");
+      return;
+    }
+Serial.print(F("4"));
   cadastrarProfissional(strNomeProfissional + ";" + strSenhaProfissional + "\n");
+  Serial.print(F("5"));
   cadastroOutput.Set_font_color_pco(1024);
   cadastroOutput.setText("Profissional cadastrado(a)");
   nomeProfissional.setText("");
@@ -543,12 +583,10 @@ void btnCadastrarPushCallback(void *ptr) {
   confirmaSenha.setText("");
 }
 
-bool procurarSenha(String password) {
-  String filename = "bd.txt";
-  if (!isSdOk)
-    return;
-
+bool procurarSenha(String password, String filename) {
   bool encontrou = false;
+  if (!isSdOk)
+    return encontrou;  
 
   File arquivo = SD.open(filename);
   if (arquivo) {
@@ -622,7 +660,22 @@ void lerSD(String filename) {
   }
 }
 void cadastrarProfissional(String str) {
-  gravarSD(str, "bd.txt");
+  uint32_t iProfissional;
+  uint32_t iGerente;
+  uint32_t iTecnico;
+
+  cProfissional.getValue(&iProfissional);
+  cGerente.getValue(&iGerente);
+  cTecnico.getValue(&iTecnico);
+  
+  if(iProfissional == 1)
+    gravarSD(str, BDPROFISSIONAIS);
+
+  if(iGerente == 1)
+    gravarSD(str, BDGERENTES);
+
+  if(iTecnico == 1)
+    gravarSD(str, BDTECNICOS);
 }
 
 void btnConectarPushCallback(void *ptr) {
@@ -839,6 +892,8 @@ String prepararDadosSdShampoo() {
     case BIONEUTRAL:
       msg += "Bioneutral";
       break;
+    case NENHUM:
+      break;
   }
   msg += ";";
   msg += "volume:";
@@ -905,6 +960,8 @@ String prepararDadosWifiShampoo() {
     case BIONEUTRAL:
       m += "idProduto:4";
       break;
+    case NENHUM:
+      break;
   }
   m += "_";
   m += "vol.:";
@@ -936,7 +993,9 @@ String criarMensagemJsonShampoo() {
       doc["idProduto"] = 3;
       break;
     case BIONEUTRAL:
-
+      doc["idProduto"] = 4;
+      break;
+    case NENHUM:
       break;
   }
 
@@ -1144,7 +1203,6 @@ int retornaInteiro(NexText texto) {
 
 void salvarConfiguracaoValvulas() {
   int tempos[QTDVALVULAS] = {0};
-  char buff[6];
 
   //shampoo
   tempos[0] = retornaInteiro(rele1);
@@ -1273,7 +1331,7 @@ void btnIniciarPopCallback(void *ptr) {
     return;
   }
 
-  if (procurarSenha(strSenha)) {
+  if (procurarSenha(strSenha, BDPROFISSIONAIS)) {
     resetarPopupSenha();
     if (opcao == SHAMPOO) {
       rodaShampoo();
