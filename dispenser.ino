@@ -73,6 +73,9 @@ NexSlider slAntibreak = NexSlider(2, 18, "h4");
 NexSlider slGrowth = NexSlider(2, 19, "h5");
 NexSlider slCurly = NexSlider(2, 20, "h6");
 
+//page3
+NexText msgLoading = NexText(3, 2, "t0");
+
 // page6
 NexText rele1 = NexText(6, 15, "rele1");
 NexText rele2 = NexText(6, 16, "rele2");
@@ -117,14 +120,13 @@ NexCheckbox cGerente = NexCheckbox(8, 11, "c0");
 NexCheckbox cTecnico = NexCheckbox(8, 12, "c1");
 
 //page8 conexao com a internet
-//NexText txtRede = NexText(9, 4, "txtRede"); //Funcionou com 9.
-NexComboBox comboRede = NexComboBox(9, 11, "txtRede");
+NexComboBox comboRede = NexComboBox(9, 10, "txtRede");//Funcionou com 9.
 NexText txtSenha = NexText(9, 4, "txtSenha");
 NexText txtConexao = NexText(9, 7, "txtConexao");
 NexButton btnConectar = NexButton(9, 6, "btnConectar");
 
 NexText txtIP = NexText(9, 8, "txtIP");
-NexButton btnGravar = NexButton(9, 10, "btnGravar");
+NexButton btnGravar = NexButton(9, 9, "btnGravar");
 
 //page9 popup p/ liberar produtos
 NexText txtComanda = NexText(11, 3, "txtComanda");
@@ -143,6 +145,7 @@ NexButton btnFecharGerenciar = NexButton(12, 5, "b1");
 NexPage page0 = NexPage(0, 0, "page0");
 NexPage page1 = NexPage(1, 0, "page1");
 NexPage page2 = NexPage(2, 0, "page2");
+NexPage page3 = NexPage(3, 0, "page3");
 NexPage page4 = NexPage(4, 0, "page4");
 NexPage page5 = NexPage(5, 0, "page5");
 NexPage page11 = NexPage(11, 0, "page9");
@@ -492,14 +495,14 @@ void btnProximoPopCallback(void *ptr) {
       resetarPopupSenha();
       page7.show();
       mostrarConfiguracaoValvulas();
-    }else {
+    } else {
       txtMsgGerenciar.setText("Senha nao encontrada");
     }
-  }else if(opcao == CADASTRO){
+  } else if (opcao == CADASTRO) {
     if (procurarSenha(strSenha, BDGERENTES)) {
       resetarPopupSenha();
       page8.show();
-    }else {
+    } else {
       txtMsgGerenciar.setText("Senha nao encontrada");
     }
   }
@@ -552,22 +555,22 @@ void btnCadastrarPopCallback(void *ptr) {
   cGerente.getValue(&iGerente);
   cTecnico.getValue(&iTecnico);
 
-  if(iProfissional == 0 && iGerente == 0 && iTecnico == 0){
+  if (iProfissional == 0 && iGerente == 0 && iTecnico == 0) {
     cadastroOutput.setText("Escolha ao menos um perfil");
     return;
   }
- 
-  if(iProfissional == 1)
+
+  if (iProfissional == 1)
     if (procurarSenha(strSenhaProfissional, BDPROFISSIONAIS)) {
       cadastroOutput.setText("Senha invalida.");
       return;
     }
-  if(iTecnico == 1)
+  if (iTecnico == 1)
     if (procurarSenha(strSenhaProfissional, BDTECNICOS)) {
       cadastroOutput.setText("Senha invalida.");
       return;
     }
-  if(iGerente == 1)
+  if (iGerente == 1)
     if (procurarSenha(strSenhaProfissional, BDGERENTES)) {
       cadastroOutput.setText("Senha invalida.");
       return;
@@ -586,7 +589,7 @@ void btnCadastrarPopCallback(void *ptr) {
 bool procurarSenha(String password, String filename) {
   bool encontrou = false;
   if (!isSdOk)
-    return encontrou;  
+    return encontrou;
 
   File arquivo = SD.open(filename);
   if (arquivo) {
@@ -610,12 +613,13 @@ bool procurarSenha(String password, String filename) {
   return encontrou;
 }
 
-void reenviarDadosTemporarios() {
+bool reenviarDadosTemporarios() {
+  bool enviou = false;
   String arquivo = "tmp.txt";
   if (SD.exists(arquivo)) {
     File forigem = SD.open(arquivo);
-
     if (forigem) {
+      enviou = true;
       while (forigem.available()) {
         String linha = forigem.readStringUntil('\n');
         enviarDadosWifi(linha);
@@ -624,6 +628,7 @@ void reenviarDadosTemporarios() {
       SD.remove(arquivo);
     }
   }
+  return enviou;
 }
 
 void gravarSD(String msg, String filename) {
@@ -667,14 +672,14 @@ void cadastrarProfissional(String str) {
   cProfissional.getValue(&iProfissional);
   cGerente.getValue(&iGerente);
   cTecnico.getValue(&iTecnico);
-  
-  if(iProfissional == 1)
+
+  if (iProfissional == 1)
     gravarSD(str, BDPROFISSIONAIS);
 
-  if(iGerente == 1)
+  if (iGerente == 1)
     gravarSD(str, BDGERENTES);
 
-  if(iTecnico == 1)
+  if (iTecnico == 1)
     gravarSD(str, BDTECNICOS);
 }
 
@@ -1640,8 +1645,9 @@ NexTouch *nex_listen_list[] = {
 
 void setup() {
   Serial.begin(9600);
-  
+
   nexInit();
+  page3.show();
 
   definirSaidas();
   resetarReles();
@@ -1655,7 +1661,26 @@ void setup() {
   desconectarWifi(); //modulo conecta na ultima rede assim que ligado
   lerIpComputadorRemoto();
 
+  msgLoading.setText("Conectando...");
   iniciarWifi();
+
+  if (conectado) {
+    msgLoading.setText("Conectado");
+  } else {
+    msgLoading.setText("Desconectado");
+  }
+
+  delay(1000);
+
+  if (wifiSerial.createTCP(hostIp, port)) {
+    if(reenviarDadosTemporarios()){
+      msgLoading.setText("Comandas enviadas com sucesso.");
+      delay(1000);
+    }
+    wifiSerial.releaseTCP();    
+  }
+
+  msgLoading.setText("");
 
   btnReles.attachPush(btnRelesPushCallback, &btnReles);
   btnCadastrar.attachPop(btnCadastrarPopCallback);
@@ -1710,6 +1735,8 @@ void setup() {
   btnRele16At.attachPop(btnRele16AtPopCallback);
 
   btnCadastro.attachPush(btnCadastroPushCallback, &btnCadastro);
+
+  page0.show();
 }
 
 void loop() {
