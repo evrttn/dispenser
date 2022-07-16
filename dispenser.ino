@@ -41,6 +41,8 @@ NexButton btnTreatment = NexButton(0, 2, "bt1");
 NexButton btnWifi = NexButton(0, 5, "btWifi");
 NexButton btnCadastro = NexButton(0, 4, "btnCadastro");
 
+NexButton bZero = NexButton(0, 6, "b0");
+
 // page1
 NexDSButton btRegenerant = NexDSButton(1, 5, "bt1");
 NexDSButton btNutrition = NexDSButton(1, 6, "bt2");
@@ -141,6 +143,10 @@ NexText txtMsgGerenciar  = NexText(12, 6, "txtMsg");
 NexButton btnProximo = NexButton(12, 4, "btnProximo");
 NexButton btnFecharGerenciar = NexButton(12, 5, "b1");
 
+//page11 
+NexDataRecord tabela = NexDataRecord(13, 2,"data0");
+NexButton btnInativar = NexButton(13, 1, "btnInativar");
+
 // paginas
 NexPage page0 = NexPage(0, 0, "page0");
 NexPage page1 = NexPage(1, 0, "page1");
@@ -153,6 +159,7 @@ NexPage page7 = NexPage(7, 0, "page6");
 NexPage page9 = NexPage(9, 0, "page8");
 NexPage page12 = NexPage(12, 0, "page10");
 NexPage page8 = NexPage(8, 0, "page7");
+NexPage page13 = NexPage(13, 0, "page11");
 
 //variaveis shampoo
 enum shampoo {REGENERANT, NUTRITION, ANTIFRISO, BIONEUTRAL, NENHUM};
@@ -1570,7 +1577,42 @@ void btnRele10AtPopCallback(void *ptr) {
   txtMsgAt.setText("");
 }
 
-//============================================================================
+void bZeroPushCallback(void *ptr) {
+  carregarUsuariosCadastrados();
+  page13.show();
+}
+//=======================================USUARIOS CADASTRADOS===============================
+void lerCadastro(String filename, String perfil) {
+  if (!isSdOk)
+    return;
+
+  File arquivo = SD.open(filename);
+  if (arquivo) {
+    while (arquivo.available()) {
+      String nomeSenha = arquivo.readStringUntil('\n');
+      int idxSeparador = nomeSenha.lastIndexOf(";");
+      String senha = nomeSenha.substring(idxSeparador + 1);
+      String profissional = nomeSenha.substring(0, idxSeparador);
+      profissional = profissional + "^" + perfil;
+      Serial.println(profissional);      
+      tabela.insert(profissional);
+    }
+    arquivo.close();
+  } else {
+    Serial.print(F("error opening "));
+    Serial.println(filename);
+  }
+
+  return;
+}
+void carregarUsuariosCadastrados(){
+  tabela.clearAll();
+  lerCadastro("TEC.TXT", "Tecnico");
+  lerCadastro("GER.TXT", "Gerente");
+  lerCadastro("PRO.TXT", "Profissional");  
+}
+
+//===========================================================================================
 void gotoPage0() {
   page0.show();
 }
@@ -1640,6 +1682,7 @@ NexTouch *nex_listen_list[] = {
   &btnProximo,
   &btnFecharGerenciar,
   &btnCadastro,
+  &bZero,
   NULL
 };
 
@@ -1735,6 +1778,8 @@ void setup() {
   btnRele16At.attachPop(btnRele16AtPopCallback);
 
   btnCadastro.attachPush(btnCadastroPushCallback, &btnCadastro);
+
+  bZero.attachPush(bZeroPushCallback, &bZero);
 
   page0.show();
 }
