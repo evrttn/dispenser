@@ -320,6 +320,8 @@ void rodaShampoo() {
 
     gravarSD(prepararDadosSdShampoo(), "sham.txt");
 
+    enviarJson(criarMensagemJsonShampoo());
+
     String dadosWifi = prepararDadosWifiShampoo();
     if (wifiSerial.createTCP(hostIp, port)) {
       reenviarDadosTemporarios();
@@ -986,45 +988,92 @@ String prepararDadosWifiShampoo() {
   return m;
 }
 
+
 String criarMensagemJsonShampoo() {
   StaticJsonDocument<200> doc;
-  doc["profissional"] = profissional;
-  doc["numeroComanda"] = numeroComanda;
+  doc["codMaquina"] = 1;
+  doc["codSalao"] = 1;
+  doc["codUsuario"] = 1;
+  doc["nomeUsuario"] = profissional;
+  doc["numero"] = numeroComanda;
   doc["photoactive"] = photoactive;
-  doc["tipo"] = "Shampoo";
   doc["volumeTotal"] = volume;
-
-  switch (opcaoShampoo) {
-    case REGENERANT:
-      doc["idProduto"] = 1;
-      break;
-    case NUTRITION:
-      doc["idProduto"] = 2;
-      break;
-    case ANTIFRISO:
-      doc["idProduto"] = 3;
-      break;
-    case BIONEUTRAL:
-      doc["idProduto"] = 4;
-      break;
-    case NENHUM:
-      break;
-  }
+  doc["tipo"] = 0;
 
   RtcDateTime now = Rtc.GetDateTime();
   char data[11];
   char hora[7];
   snprintf_P(data, countof(data), PSTR("%02u/%02u/%04u"), now.Day(), now.Month(), now.Year());
   snprintf_P(hora, countof(hora), PSTR("%02u#%02u"), now.Hour(), now.Minute());
+  //doc["data"] = String(data) + String(hora);
 
-  doc["hora"] = hora;
-  doc["data"] = data;
-  doc["volume"] = volume;
+  JsonArray items = doc.createNestedArray("items");
+  
+  //for (int i = 0, j = 5, k = 10; i < 3; i++, j++, k++) {
+      JsonObject objItems = items.createNestedObject();
 
-  String json = "";
-  serializeJson(doc, json);
+      switch (opcaoShampoo) {
+      case REGENERANT:
+        objItems["codProduto"] = 1;
+        break;
+      case NUTRITION:
+        objItems["codProduto"] = 2;
+        break;
+      case ANTIFRISO:
+        objItems["codProduto"] = 3;
+        break;
+      case BIONEUTRAL:
+        objItems["codProduto"] = 4;
+        break;
+      case NENHUM:
+        break;
+    }
+          
+      objItems["volume"] = volume;
+      objItems["porcentagem"] = 100;    
+  //}
 
-  return json;
+  String dados = "";
+  serializeJson(doc, dados);
+  
+  return dados;
+}
+
+void enviarJson(String data)
+{
+  uint8_t buffer[1024] = {0};
+
+  String HOST_NAME = "galusa.ddns.com.br";
+  int HOST_PORT = 9090;
+
+  if (wifiSerial.createTCP(HOST_NAME, HOST_PORT)) {
+    Serial.print("create tcp ok\r\n");
+  } else {
+    Serial.print("create tcp err\r\n");
+    return;
+  }
+
+  String server = HOST_NAME + ":" + HOST_PORT;
+  String uri = "/dispenserweb/comanda/adiciona/";
+   
+  String postRequest =
+    "POST " + uri + " HTTP/1.0\r\n" +
+    "Host: " + server + "\r\n" +
+    "Accept: *" + "/" + "*\r\n" +
+    "Content-Length: " + data.length() + "\r\n" +
+    "Content-Type: application/json\r\n" +
+    "\r\n" + data;
+
+  wifiSerial.send(postRequest.c_str(), postRequest.length());
+
+  uint32_t len = wifiSerial.recv(buffer, sizeof(buffer), 10000);
+  if (len > 0) {
+    Serial.print("Received:[");
+    for (uint32_t i = 0; i < len; i++) {
+      Serial.print((char)buffer[i]);
+    }
+    Serial.print("]\r\n");
+  }
 }
 
 String prepararDadosSdTratamento(unsigned long volumeBase, unsigned long volumeCondicionador[]) {
