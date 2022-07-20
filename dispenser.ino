@@ -147,6 +147,11 @@ NexButton btnFecharGerenciar = NexButton(12, 5, "b1");
 NexDataRecord tabela = NexDataRecord(13, 2,"data0");
 NexButton btnInativar = NexButton(13, 1, "btnInativar");
 
+//page12
+NexButton btnCurto = NexButton(7, 31, "b16");
+NexButton btnMedio = NexButton(7, 32, "b15");
+NexButton btnLongo = NexButton(7, 33, "b14");
+
 // paginas
 NexPage page0 = NexPage(0, 0, "page0");
 NexPage page1 = NexPage(1, 0, "page1");
@@ -160,12 +165,14 @@ NexPage page9 = NexPage(9, 0, "page8");
 NexPage page12 = NexPage(12, 0, "page10");
 NexPage page8 = NexPage(8, 0, "page7");
 NexPage page13 = NexPage(13, 0, "page11");
+NexPage page14 = NexPage(14, 0, "page12");
+
 
 //variaveis shampoo
 enum shampoo {REGENERANT, NUTRITION, ANTIFRISO, BIONEUTRAL, NENHUM};
 shampoo opcaoShampoo;
 
-enum funcionalidade {SHAMPOO, TRATAMENTO, RELES, CADASTRO};
+enum funcionalidade {SHAMPOO, TRATAMENTO, RELES, CADASTRO, MAPPING};
 funcionalidade opcao;
 
 //variaveis condicionador
@@ -199,6 +206,9 @@ String numeroComanda = "";
 const String BDPROFISSIONAIS = "PRO.TXT";
 const String BDGERENTES = "GER.TXT";
 const String BDTECNICOS = "TEC.TXT";
+
+//=======================CODIGOS================
+
 
 void btPhotoactiveTrPushCallback(void *ptr) {
   photoactive = !photoactive;
@@ -336,7 +346,7 @@ void rodaShampoo() {
   page0.show();
 }
 
-//=====================================TRATAMENTO==========================================
+//=====================================BOTOES TRATAMENTO==========================================
 unsigned long volumeTotal = 0;
 
 void btNutriTrPushCallback(void *ptr) {
@@ -488,7 +498,7 @@ void btMixTrPushCallback(void *ptr) {
   opcao = TRATAMENTO;
   page11.show();
 }
-
+//================================================================================================
 void btnProximoPopCallback(void *ptr) {
   char buffSenha[11] = {0};
   txtSenha.getText(buffSenha, sizeof(buffSenha));
@@ -622,57 +632,6 @@ bool procurarSenha(String password, String filename) {
   return encontrou;
 }
 
-bool reenviarDadosTemporarios() {
-  bool enviou = false;
-  String arquivo = "tmp.txt";
-  if (SD.exists(arquivo)) {
-    File forigem = SD.open(arquivo);
-    if (forigem) {
-      enviou = true;
-      while (forigem.available()) {
-        String linha = forigem.readStringUntil('\n');
-        enviarDadosWifi(linha);
-      }
-      forigem.close();
-      SD.remove(arquivo);
-    }
-  }
-  return enviou;
-}
-
-void gravarSD(String msg, String filename) {
-  if (!isSdOk)
-    return;
-
-  File file = SD.open(filename, FILE_WRITE);
-  if (file) {
-    Serial.println(F("Gravando no SD card: "));
-    Serial.println(msg);
-    file.print(msg);
-    delay (1000);
-    file.close();
-  } else {
-    Serial.print(F("Erro ao abrir arquivo "));
-    Serial.println(filename);
-  }
-}
-
-void lerSD(String filename) {
-  if (!isSdOk)
-    return;
-
-  File myFile = SD.open(filename);
-  if (myFile) {
-    while (myFile.available()) {
-      String nomeSenha = myFile.readStringUntil('\n');
-      Serial.println(nomeSenha);
-    }
-    myFile.close();
-  } else {
-    Serial.print(F("error opening "));
-    Serial.println(filename);
-  }
-}
 void cadastrarProfissional(String str) {
   uint32_t iProfissional;
   uint32_t iGerente;
@@ -867,6 +826,40 @@ void resetarVariaveisTratamento() {
 }
 
 //=========================CARTAO SD E RTC=====================================
+void gravarSD(String msg, String filename) {
+  if (!isSdOk)
+    return;
+
+  File file = SD.open(filename, FILE_WRITE);
+  if (file) {
+    Serial.println(F("Gravando no SD card: "));
+    Serial.println(msg);
+    file.print(msg);
+    delay (1000);
+    file.close();
+  } else {
+    Serial.print(F("Erro ao abrir arquivo "));
+    Serial.println(filename);
+  }
+}
+
+void lerSD(String filename) {
+  if (!isSdOk)
+    return;
+
+  File myFile = SD.open(filename);
+  if (myFile) {
+    while (myFile.available()) {
+      String nomeSenha = myFile.readStringUntil('\n');
+      Serial.println(nomeSenha);
+    }
+    myFile.close();
+  } else {
+    Serial.print(F("error opening "));
+    Serial.println(filename);
+  }
+}
+
 void initRTC() {
   //Aciona o relogio
   Rtc.Begin();
@@ -932,150 +925,6 @@ String prepararDadosSdShampoo() {
   return msg;
 }
 
-String prepararDadosWifiShampoo() {
-  String m = "profissional:";
-  m += profissional;
-  m += "_";
-  m += "comanda:";
-  m += numeroComanda;
-  m += "_";
-  m += "photo.:";
-  m += photoactive;
-  m += "_";
-  m += "numProdutos:1";
-  m += "_";
-  m += "tipo:Shampoo";
-  m += "_";
-  m += "volumeTotal:";
-  m += volume;
-  m += "_";
-  RtcDateTime now = Rtc.GetDateTime();
-  char data[11];
-  char hora[7];
-  snprintf_P(data, countof(data), PSTR("%02u/%02u/%04u"), now.Day(), now.Month(), now.Year());
-  snprintf_P(hora, countof(hora), PSTR("%02u#%02u"), now.Hour(), now.Minute());
-  m += "hora:";
-  m += hora;
-  m += "_";
-  m += "data:";
-  m += data;
-  m += "_";
-
-  switch (opcaoShampoo) {
-    case REGENERANT:
-      m += "idProduto:1";
-      break;
-    case NUTRITION:
-      m += "idProduto:2";
-      break;
-    case ANTIFRISO:
-      m += "idProduto:3";
-      break;
-    case BIONEUTRAL:
-      m += "idProduto:4";
-      break;
-    case NENHUM:
-      break;
-  }
-  m += "_";
-  m += "vol.:";
-  m += volume;
-  m += "_";
-  m += "porc.:";
-  m += 100;
-  m += "&";
-
-  return m;
-}
-
-
-String criarMensagemJsonShampoo() {
-  StaticJsonDocument<200> doc;
-  doc["codMaquina"] = 1;
-  doc["codSalao"] = 1;
-  doc["codUsuario"] = 1;
-  doc["nomeUsuario"] = profissional;
-  doc["numero"] = numeroComanda;
-  doc["photoactive"] = photoactive;
-  doc["volumeTotal"] = volume;
-  doc["tipo"] = 0;
-
-  RtcDateTime now = Rtc.GetDateTime();
-  char data[11];
-  char hora[7];
-  snprintf_P(data, countof(data), PSTR("%02u/%02u/%04u"), now.Day(), now.Month(), now.Year());
-  snprintf_P(hora, countof(hora), PSTR("%02u#%02u"), now.Hour(), now.Minute());
-  //doc["data"] = String(data) + String(hora);
-
-  JsonArray items = doc.createNestedArray("items");
-  
-  //for (int i = 0, j = 5, k = 10; i < 3; i++, j++, k++) {
-      JsonObject objItems = items.createNestedObject();
-
-      switch (opcaoShampoo) {
-      case REGENERANT:
-        objItems["codProduto"] = 1;
-        break;
-      case NUTRITION:
-        objItems["codProduto"] = 2;
-        break;
-      case ANTIFRISO:
-        objItems["codProduto"] = 3;
-        break;
-      case BIONEUTRAL:
-        objItems["codProduto"] = 4;
-        break;
-      case NENHUM:
-        break;
-    }
-          
-      objItems["volume"] = volume;
-      objItems["porcentagem"] = 100;    
-  //}
-
-  String dados = "";
-  serializeJson(doc, dados);
-  
-  return dados;
-}
-
-void enviarJson(String data)
-{
-  uint8_t buffer[1024] = {0};
-
-  String HOST_NAME = "galusa.ddns.com.br";
-  int HOST_PORT = 9090;
-
-  if (wifiSerial.createTCP(HOST_NAME, HOST_PORT)) {
-    Serial.print("create tcp ok\r\n");
-  } else {
-    Serial.print("create tcp err\r\n");
-    return;
-  }
-
-  String server = HOST_NAME + ":" + HOST_PORT;
-  String uri = "/dispenserweb/comanda/adiciona/";
-   
-  String postRequest =
-    "POST " + uri + " HTTP/1.0\r\n" +
-    "Host: " + server + "\r\n" +
-    "Accept: *" + "/" + "*\r\n" +
-    "Content-Length: " + data.length() + "\r\n" +
-    "Content-Type: application/json\r\n" +
-    "\r\n" + data;
-
-  wifiSerial.send(postRequest.c_str(), postRequest.length());
-
-  uint32_t len = wifiSerial.recv(buffer, sizeof(buffer), 10000);
-  if (len > 0) {
-    Serial.print("Received:[");
-    for (uint32_t i = 0; i < len; i++) {
-      Serial.print((char)buffer[i]);
-    }
-    Serial.print("]\r\n");
-  }
-}
-
 String prepararDadosSdTratamento(unsigned long volumeBase, unsigned long volumeCondicionador[]) {
   RtcDateTime now = Rtc.GetDateTime();
 
@@ -1128,50 +977,91 @@ String prepararDadosSdTratamento(unsigned long volumeBase, unsigned long volumeC
   return msg;
 }
 
-String prepararDadosWifiTratamento(unsigned long n, unsigned long volumeCondicionador[]) {
-  String m = "profissional:";
-  m += profissional;
-  m += "_";
-  m += "comanda:";
-  m += numeroComanda;
-  m += "_";
-  m += "photo.:";
-  m += photoactive;
-  m += "_";
-  m += "numProdutos:";
-  m += n;
-  m += "_";
-  m += "tipo:Tratamento";
-  m += "_";
-  m += "volumeTotal:";
-  m += volumeTotal;
+
+void lerIpComputadorRemoto() {
+  if (!isSdOk)
+    return;
+
+  File myFile = SD.open("ip.txt");
+  if (myFile) {
+    String ip = myFile.readStringUntil('\n');
+    hostIp = ip;
+    char buff[17];
+    ip.toCharArray(buff, 17);
+    txtIP.setText(buff);
+    myFile.close();
+  } else {
+    Serial.print(F("error opening "));
+    Serial.println(F("ip.txt"));
+  }
+}
+
+void btnGravarPopCallback(void *ptr) {
+  char buff[17] = {0};
+  txtIP.getText(buff, sizeof(buff));
+  String ip(buff);
+  hostIp = ip;
+
+  if (SD.exists("ip.txt")) {
+    SD.remove("ip.txt");
+  }
+
+  gravarSD(hostIp, "ip.txt");
+
+  txtConexao.setText("IP gravado");
+}
+//==========================================JSON===========================================================
+String criarMensagemJsonShampoo() {
+  StaticJsonDocument<200> doc;
+  doc["codMaquina"] = 1;
+  doc["codSalao"] = 1;
+  doc["codUsuario"] = 1;
+  doc["nomeUsuario"] = profissional;
+  doc["numero"] = numeroComanda;
+  doc["photoactive"] = photoactive;
+  doc["volumeTotal"] = volume;
+  doc["tipo"] = 0;
+
   RtcDateTime now = Rtc.GetDateTime();
   char data[11];
-  char hora[7];
-  snprintf_P(data, countof(data), PSTR("%02u/%02u/%04u"), now.Day(), now.Month(), now.Year());
-  snprintf_P(hora, countof(hora), PSTR("%02u#%02u"), now.Hour(), now.Minute());
-  m += "_";
-  m += "hora:";
-  m += hora;
-  m += "_";
-  m += "data:";
-  m += data;
+  char hora[9];
+  snprintf_P(data, countof(data), PSTR("%04u-%02u-%02u"), now.Year(), now.Month(), now.Day());
+  snprintf_P(hora, countof(hora), PSTR("%02u:%02u:%02u"), now.Hour(), now.Minute(), now.Second());
+  doc["data"] = String(data)+" "+String(hora);
 
-  for (int i = 0, j = 5; i < 7; i++, j++) {
-    if (condicionador[i]) {
-      m += "_";
-      m += "idProduto:";
-      m += j;
-      m += "_";
-      m += "vol.:";
-      m += volumeCondicionador[i];
-      m += "_";
-      m += "porc.:";
-      m += fator[i];
+  JsonArray items = doc.createNestedArray("items");
+  
+  //for (int i = 0, j = 5, k = 10; i < 3; i++, j++, k++) {
+      JsonObject objItems = items.createNestedObject();
+
+      switch (opcaoShampoo) {
+      case REGENERANT:
+        objItems["codProduto"] = 1;
+        break;
+      case NUTRITION:
+        objItems["codProduto"] = 2;
+        break;
+      case ANTIFRISO:
+        objItems["codProduto"] = 3;
+        break;
+      case BIONEUTRAL:
+        objItems["codProduto"] = 4;
+        break;
+      case NENHUM:
+        break;
     }
-  }
-  m += "&";
-  return m;
+          
+      objItems["volume"] = volume;
+      objItems["porcentagem"] = 100;    
+  //}
+
+  String dados = "";
+  
+  serializeJson(doc, dados);
+  Serial.println("DADOS:");
+  Serial.println(dados);
+  
+  return dados;
 }
 
 String criarMensagemJsonTratamento(unsigned long n, unsigned long volumeCondicionador[]) {
@@ -1206,6 +1096,42 @@ String criarMensagemJsonTratamento(unsigned long n, unsigned long volumeCondicio
   return json;
 }
 
+void enviarJson(String data)
+{
+  uint8_t buffer[1024] = {0};
+
+  String HOST_NAME = "galusa.ddns.com.br";
+  int HOST_PORT = 9090;
+
+  if (wifiSerial.createTCP(HOST_NAME, HOST_PORT)) {
+    Serial.print("create tcp ok\r\n");
+  } else {
+    Serial.print("create tcp err\r\n");
+    return;
+  } 
+
+  String server = HOST_NAME + ":" + HOST_PORT;
+  String uri = "/dispenserweb/api/comanda/adiciona/";
+   
+  String postRequest =
+    "POST " + uri + " HTTP/1.0\r\n" +
+    "Host: " + server + "\r\n" +
+    "Accept: *" + "/" + "*\r\n" +
+    "Content-Length: " + data.length() + "\r\n" +
+    "Content-Type: application/json\r\n" +
+    "\r\n" + data;
+
+  wifiSerial.send(postRequest.c_str(), postRequest.length());
+
+  uint32_t len = wifiSerial.recv(buffer, sizeof(buffer), 10000);
+  if (len > 0) {
+    Serial.print("Received:[");
+    for (uint32_t i = 0; i < len; i++) {
+      Serial.print((char)buffer[i]);
+    }
+    Serial.print("]\r\n");
+  }
+}
 //=======================CONFIGURACAO DAS VALVULAS=======================
 void lerConfiguracaoValvulas() {
   int tempos[QTDVALVULAS] = {0};
@@ -1371,73 +1297,124 @@ void iniciarWifi() {
   }
 }
 
-//============================================================================
-void btnIniciarPopCallback(void *ptr) {
-  char buff[11] = {0};
-  txtComanda.getText(buff, sizeof(buff));
-  String strComanda(buff);
-  numeroComanda = strComanda;
-
-  char buffSenha[11] = {0};
-  txtPassword.getText(buffSenha, sizeof(buffSenha));
-  String strSenha(buffSenha);
-
-  if (strComanda == NULL || strComanda.equals("")) {
-    txtMsg.setText("Comanda obrigatoria");
-    return;
-  }
-
-  if (strSenha == NULL || strSenha.equals("")) {
-    txtMsg.setText("Senha obrigatoria");
-    return;
-  }
-
-  if (procurarSenha(strSenha, BDPROFISSIONAIS)) {
-    resetarPopupSenha();
-    if (opcao == SHAMPOO) {
-      rodaShampoo();
+bool reenviarDadosTemporarios() {
+  bool enviou = false;
+  String arquivo = "tmp.txt";
+  if (SD.exists(arquivo)) {
+    File forigem = SD.open(arquivo);
+    if (forigem) {
+      enviou = true;
+      while (forigem.available()) {
+        String linha = forigem.readStringUntil('\n');
+        enviarDadosWifi(linha);
+      }
+      forigem.close();
+      SD.remove(arquivo);
     }
-    else if (opcao == TRATAMENTO)
-      rodaTratamento();
-  } else {
-    txtMsg.setText("Senha nao encontrada");
   }
+  return enviou;
 }
 
-void btnShampooPushCallback(void *ptr) {
-  resetarVariaveisShampoo();
+String prepararDadosWifiShampoo() {
+  String m = "profissional:";
+  m += profissional;
+  m += "_";
+  m += "comanda:";
+  m += numeroComanda;
+  m += "_";
+  m += "photo.:";
+  m += photoactive;
+  m += "_";
+  m += "numProdutos:1";
+  m += "_";
+  m += "tipo:Shampoo";
+  m += "_";
+  m += "volumeTotal:";
+  m += volume;
+  m += "_";
+  RtcDateTime now = Rtc.GetDateTime();
+  char data[11];
+  char hora[7];
+  snprintf_P(data, countof(data), PSTR("%02u/%02u/%04u"), now.Day(), now.Month(), now.Year());
+  snprintf_P(hora, countof(hora), PSTR("%02u#%02u"), now.Hour(), now.Minute());
+  m += "hora:";
+  m += hora;
+  m += "_";
+  m += "data:";
+  m += data;
+  m += "_";
+
+  switch (opcaoShampoo) {
+    case REGENERANT:
+      m += "idProduto:1";
+      break;
+    case NUTRITION:
+      m += "idProduto:2";
+      break;
+    case ANTIFRISO:
+      m += "idProduto:3";
+      break;
+    case BIONEUTRAL:
+      m += "idProduto:4";
+      break;
+    case NENHUM:
+      break;
+  }
+  m += "_";
+  m += "vol.:";
+  m += volume;
+  m += "_";
+  m += "porc.:";
+  m += 100;
+  m += "&";
+
+  return m;
 }
 
-void btnTreatmentPushCallback(void *ptr) {
-  resetarVariaveisTratamento();
-}
+String prepararDadosWifiTratamento(unsigned long n, unsigned long volumeCondicionador[]) {
+  String m = "profissional:";
+  m += profissional;
+  m += "_";
+  m += "comanda:";
+  m += numeroComanda;
+  m += "_";
+  m += "photo.:";
+  m += photoactive;
+  m += "_";
+  m += "numProdutos:";
+  m += n;
+  m += "_";
+  m += "tipo:Tratamento";
+  m += "_";
+  m += "volumeTotal:";
+  m += volumeTotal;
+  RtcDateTime now = Rtc.GetDateTime();
+  char data[11];
+  char hora[7];
+  snprintf_P(data, countof(data), PSTR("%02u/%02u/%04u"), now.Day(), now.Month(), now.Year());
+  snprintf_P(hora, countof(hora), PSTR("%02u#%02u"), now.Hour(), now.Minute());
+  m += "_";
+  m += "hora:";
+  m += hora;
+  m += "_";
+  m += "data:";
+  m += data;
 
-void resetarPopupSenha() {
-  txtComanda.setText("");
-  txtPassword.setText("");
-  txtSenhaGerenciar.setText("");
-}
-
-void btnFecharGerenciarPopCallback(void *ptr) {
-  resetarPopupSenha();
-  page0.show();
-}
-
-void btnCadastroPushCallback(void *ptr) {
-  resetarPopupSenha();
-  opcao = CADASTRO;
-  page12.show();
-}
-
-void btnFecharPopCallback(void *ptr) {
-  resetarVariaveisShampoo();
-  resetarVariaveisTratamento();
-  resetarPopupSenha();
-
-  if (opcao == SHAMPOO)
-    page1.show();
-  else if (opcao == TRATAMENTO)
-    page2.show();
+  for (int i = 0, j = 5; i < 7; i++, j++) {
+    if (condicionador[i]) {
+      m += "_";
+      m += "idProduto:";
+      m += j;
+      m += "_";
+      m += "vol.:";
+      m += volumeCondicionador[i];
+      m += "_";
+      m += "porc.:";
+      m += fator[i];
+    }
+  }
+  m += "&";
+  return m;
 }
 
 void btnWifiPopCallback(void *ptr) {
@@ -1507,37 +1484,73 @@ String getNomeRede(char * ptr) {
   return nome + "\r\n";
 }
 
-void lerIpComputadorRemoto() {
-  if (!isSdOk)
-    return;
+//============================================================================
+void btnIniciarPopCallback(void *ptr) {
+  char buff[11] = {0};
+  txtComanda.getText(buff, sizeof(buff));
+  String strComanda(buff);
+  numeroComanda = strComanda;
 
-  File myFile = SD.open("ip.txt");
-  if (myFile) {
-    String ip = myFile.readStringUntil('\n');
-    hostIp = ip;
-    char buff[17];
-    ip.toCharArray(buff, 17);
-    txtIP.setText(buff);
-    myFile.close();
+  char buffSenha[11] = {0};
+  txtPassword.getText(buffSenha, sizeof(buffSenha));
+  String strSenha(buffSenha);
+
+  if (strComanda == NULL || strComanda.equals("")) {
+    txtMsg.setText("Comanda obrigatoria");
+    return;
+  }
+
+  if (strSenha == NULL || strSenha.equals("")) {
+    txtMsg.setText("Senha obrigatoria");
+    return;
+  }
+
+  if (procurarSenha(strSenha, BDPROFISSIONAIS)) {
+    resetarPopupSenha();
+    if (opcao == SHAMPOO) {
+      rodaShampoo();
+    }
+    else if (opcao == TRATAMENTO)
+      rodaTratamento();
   } else {
-    Serial.print(F("error opening "));
-    Serial.println(F("ip.txt"));
+    txtMsg.setText("Senha nao encontrada");
   }
 }
 
-void btnGravarPopCallback(void *ptr) {
-  char buff[17] = {0};
-  txtIP.getText(buff, sizeof(buff));
-  String ip(buff);
-  hostIp = ip;
+void btnShampooPushCallback(void *ptr) {
+  resetarVariaveisShampoo();
+}
 
-  if (SD.exists("ip.txt")) {
-    SD.remove("ip.txt");
-  }
+void btnTreatmentPushCallback(void *ptr) {
+  resetarVariaveisTratamento();
+}
 
-  gravarSD(hostIp, "ip.txt");
+void resetarPopupSenha() {
+  txtComanda.setText("");
+  txtPassword.setText("");
+  txtSenhaGerenciar.setText("");
+}
 
-  txtConexao.setText("IP gravado");
+void btnFecharGerenciarPopCallback(void *ptr) {
+  resetarPopupSenha();
+  page0.show();
+}
+
+void btnCadastroPushCallback(void *ptr) {
+  resetarPopupSenha();
+  opcao = CADASTRO;
+  page12.show();
+}
+
+void btnFecharPopCallback(void *ptr) {
+  resetarVariaveisShampoo();
+  resetarVariaveisTratamento();
+  resetarPopupSenha();
+
+  if (opcao == SHAMPOO)
+    page1.show();
+  else if (opcao == TRATAMENTO)
+    page2.show();
 }
 //===========================================================================
 void btnRele1AtPopCallback(void *ptr) {
@@ -1732,6 +1745,9 @@ NexTouch *nex_listen_list[] = {
   &btnFecharGerenciar,
   &btnCadastro,
   &bZero,
+  &btnCurto,
+  &btnMedio,
+  &btnLongo,
   NULL
 };
 
