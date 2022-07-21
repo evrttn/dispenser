@@ -1738,20 +1738,22 @@ void rodaMapping() {
 
   unsigned long fim = millis() + volShampoo;
 
-  if (volShampoo > 0) {
+ 
     page4.show();
     digitalWrite (RELE8_PHOTOACTIVE, LOW);
 
     digitalWrite (rele, LOW);
     while (millis() < fim) {
     }
-  }
+  
   digitalWrite (rele, HIGH);
+  delay(100);
   
   unsigned long tempoT1 = volume * tempoValvulaCondicionador[0];
   unsigned long tempoT2 = volume * tempoValvulaCondicionador[1];
 
   liberarCondicionador(RELE16_NUTRI, tempoT1); // 
+  delay(100);
   liberarCondicionador(RELE15_REPAIR, tempoT2); // 
     
   digitalWrite (RELE8_PHOTOACTIVE, HIGH);
