@@ -1257,7 +1257,7 @@ String prepararDadosWifiShampoo() {
 }
 
 String prepararDadosWifiTratamento(unsigned long n, unsigned long volumeCondicionador[]) {
-  String m = prepararDadosComum(3, volumeTotal, "Tratamento");
+  String m = prepararDadosComum(n, volumeTotal, "Tratamento");
 
   for (int i = 0, j = 5; i < 7; i++, j++) {
     if (condicionador[i]) {
@@ -1697,7 +1697,7 @@ void rodaTratamento() {
     page5.show();//retire seu produto
 
     gravarSD(prepararDadosSdTratamento(volumeBase, volumeCondicionador), "trat.txt");
-    enviarJson(criarMensagemJsonTratamento());
+    enviarJson(criarMensagemJsonTratamento(n, volumeCondicionador));
 
     String dadosWifi = prepararDadosWifiTratamento(n, volumeCondicionador);
     if (wifiSerial.createTCP(hostIp, port)) {
