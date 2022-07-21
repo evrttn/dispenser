@@ -905,10 +905,9 @@ String criarMensagemJsonShampoo() {
 
   JsonArray items = doc.createNestedArray("items");
   
-  //for (int i = 0, j = 5, k = 10; i < 3; i++, j++, k++) {
-      JsonObject objItems = items.createNestedObject();
+  JsonObject objItems = items.createNestedObject();
 
-      switch (opcaoShampoo) {
+  switch (opcaoShampoo) {
       case REGENERANT:
         objItems["codProduto"] = 1;
         break;
@@ -923,50 +922,50 @@ String criarMensagemJsonShampoo() {
         break;
       case NENHUM:
         break;
-    }
+   }
           
-      objItems["volume"] = volume;
-      objItems["porcentagem"] = 100;    
-  //}
+  objItems["volume"] = volume;
+  objItems["porcentagem"] = 100;
 
   String dados = "";
   
   serializeJson(doc, dados);
-  Serial.println("DADOS:");
-  Serial.println(dados);
   
   return dados;
 }
 
 String criarMensagemJsonTratamento(unsigned long n, unsigned long volumeCondicionador[]) {
   StaticJsonDocument<200> doc;
-  doc["profissional"] = profissional;
-  doc["numeroComanda"] = numeroComanda;
+  doc["codMaquina"] = 1;
+  doc["codSalao"] = 1;
+  doc["codUsuario"] = 1;
+  doc["nomeUsuario"] = profissional;
+  doc["numero"] = numeroComanda;
   doc["photoactive"] = photoactive;
-  doc["tipo"] = "Tratamento";
-  doc["volumeTotal"] = volumeTotal;
+  doc["volumeTotal"] = volume;
+  doc["tipo"] = 1;
 
   RtcDateTime now = Rtc.GetDateTime();
   char data[11];
-  char hora[7];
-  snprintf_P(data, countof(data), PSTR("%02u/%02u/%04u"), now.Day(), now.Month(), now.Year());
-  snprintf_P(hora, countof(hora), PSTR("%02u#%02u"), now.Hour(), now.Minute());
+  char hora[9];
+  snprintf_P(data, countof(data), PSTR("%04u-%02u-%02u"), now.Year(), now.Month(), now.Day());
+  snprintf_P(hora, countof(hora), PSTR("%02u:%02u:%02u"), now.Hour(), now.Minute(), now.Second());
+  doc["data"] = String(data)+" "+String(hora);
 
-  doc["hora"] = hora;
-  doc["data"] = data;
-
-  JsonObject objCondicionador = doc.createNestedObject();
+  JsonArray items = doc.createNestedArray("items");
 
   for (int i = 0, j = 5; i < 7; i++, j++) {
+    JsonObject objItems = items.createNestedObject();
     if (condicionador[i]) {
-      objCondicionador["idProduto"] = j;
-      objCondicionador["volume"] = volumeCondicionador[i];
-      objCondicionador["porcentagem"] = fator[i];
+      objItems["codProduto"] = j;
+      objItems["volume"] = volumeCondicionador[i];
+      objItems["porcentagem"] = fator[i];
     }
   }
   String json = "";
   serializeJson(doc, json);
-
+  Serial.println("DADOS:");
+  Serial.println(json);
   return json;
 }
 
@@ -1698,6 +1697,7 @@ void rodaTratamento() {
     page5.show();//retire seu produto
 
     gravarSD(prepararDadosSdTratamento(volumeBase, volumeCondicionador), "trat.txt");
+    enviarJson(criarMensagemJsonTratamento());
 
     String dadosWifi = prepararDadosWifiTratamento(n, volumeCondicionador);
     if (wifiSerial.createTCP(hostIp, port)) {
