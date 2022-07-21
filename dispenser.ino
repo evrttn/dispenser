@@ -40,6 +40,7 @@ NexButton btnShampoo = NexButton(0, 1, "bt0");
 NexButton btnTreatment = NexButton(0, 2, "bt1");
 NexButton btnWifi = NexButton(0, 5, "btWifi");
 NexButton btnCadastro = NexButton(0, 4, "btnCadastro");
+NexButton btnMapping = NexButton(0, 7, "bt2");
 
 NexButton bZero = NexButton(0, 6, "b0");
 
@@ -148,9 +149,10 @@ NexDataRecord tabela = NexDataRecord(13, 2,"data0");
 NexButton btnInativar = NexButton(13, 1, "btnInativar");
 
 //page12
-NexButton btnCurto = NexButton(7, 31, "b16");
-NexButton btnMedio = NexButton(7, 32, "b15");
-NexButton btnLongo = NexButton(7, 33, "b14");
+NexDSButton btnCurto = NexDSButton(14, 3, "bt3");
+NexDSButton btnMedio = NexDSButton(14, 4, "bt4");
+NexDSButton btnLongo = NexDSButton(14, 5, "bt5");
+NexButton btMixMap = NexButton(14, 2, "btMix");
 
 // paginas
 NexPage page0 = NexPage(0, 0, "page0");
@@ -174,6 +176,10 @@ shampoo opcaoShampoo;
 
 enum funcionalidade {SHAMPOO, TRATAMENTO, RELES, CADASTRO, MAPPING};
 funcionalidade opcao;
+
+//variaveis shampoo
+enum mapping {CURTO, MEDIO, LONGO, NONE};
+mapping opcaoMapping;
 
 //variaveis condicionador
 bool condicionador[7];
@@ -209,6 +215,10 @@ const String BDTECNICOS = "TEC.TXT";
 
 //=======================CODIGOS================
 
+//=======================VOLUMES===============
+unsigned long volume = 0;
+unsigned long volumeTotal = 0;
+//=========================================================
 
 void btPhotoactiveTrPushCallback(void *ptr) {
   photoactive = !photoactive;
@@ -218,9 +228,53 @@ void btPhotoactiveShPushCallback(void *ptr) {
   photoactive = !photoactive;
 }
 
-//=====================================SHAMPOO==========================================
-unsigned long volume = 0;
 
+//======================================RESETS==========================================
+void resetarPopupSenha() {
+  txtComanda.setText("");
+  txtPassword.setText("");
+  txtSenhaGerenciar.setText("");
+}
+
+void resetarReles() {
+  digitalWrite (RELE1_REGENERANT, HIGH);
+  digitalWrite (RELE2_NUTRITION, HIGH);
+  digitalWrite (RELE3_ANTIFRISO, HIGH);
+  digitalWrite (RELE4_BIONEUTRAL, HIGH);
+  digitalWrite (RELE8_PHOTOACTIVE, HIGH);
+}
+
+void resetarRelesTratamento() {
+  digitalWrite (RELE16_NUTRI, HIGH);
+  digitalWrite (RELE14_DENSITY, HIGH);
+  digitalWrite (RELE15_REPAIR, HIGH);
+  digitalWrite (RELE13_DISCIPLINE, HIGH);
+  digitalWrite (RELE12_ANTIBREAK, HIGH);
+  digitalWrite (RELE11_GROWTH, HIGH);
+  digitalWrite (RELE10_CURLY, HIGH);
+  digitalWrite (RELE9_BASE, HIGH);
+  digitalWrite (RELE8_PHOTOACTIVE, HIGH);
+}
+
+void resetarVariaveisShampoo() {
+  opcaoShampoo = NENHUM;
+  photoactive = true;
+  volume = 0;
+  volumeShampoo.setText("");
+}
+
+void resetarVariaveisTratamento() {
+
+  for (int i = 0; i < 7; i++)
+    condicionador[i] = false;
+
+  for (int i = 0; i < 7; i++)
+    fator[i] = 0;
+
+  photoactive = true;
+  volumeTotal = 0;
+}
+//=====================================SHAMPOO==========================================
 void btRegenerantPushCallback(void *ptr) {
   uint32_t ds;
   btRegenerant.getValue(&ds);
@@ -289,66 +343,7 @@ bool validarShampoo() {
 
   return true;
 }
-
-void rodaShampoo() {
-
-  unsigned long volShampoo = 0;
-  int rele = 0;
-  switch (opcaoShampoo) {
-    case REGENERANT:
-      rele = RELE1_REGENERANT;
-      volShampoo = (unsigned long)volume * K_valvula_0;
-      break;
-    case NUTRITION:
-      rele = RELE2_NUTRITION;
-      volShampoo = (unsigned long)volume * K_valvula_1;
-      break;
-    case ANTIFRISO:
-      rele = RELE3_ANTIFRISO;
-      volShampoo = (unsigned long)volume * K_valvula_2;
-      break;
-    case BIONEUTRAL:
-      rele = RELE4_BIONEUTRAL;
-      volShampoo = (unsigned long)volume * K_valvula_11;
-      break;
-    case NENHUM:
-      break;
-  }
-
-  unsigned long fim = millis() + volShampoo;
-
-  if (volShampoo > 0) {
-    page4.show();
-    if (photoactive)
-      digitalWrite (RELE8_PHOTOACTIVE, LOW);
-
-    digitalWrite (rele, LOW);
-    while (millis() < fim) {
-    }
-    resetarReles();
-    page5.show();//retire seu produto
-
-    gravarSD(prepararDadosSdShampoo(), "sham.txt");
-
-    enviarJson(criarMensagemJsonShampoo());
-
-    String dadosWifi = prepararDadosWifiShampoo();
-    if (wifiSerial.createTCP(hostIp, port)) {
-      reenviarDadosTemporarios();
-      delay(500);
-      enviarDadosWifi(dadosWifi);
-      wifiSerial.releaseTCP();
-    } else {
-      dadosWifi += "\n";
-      gravarSD(dadosWifi, "tmp.txt");
-    }
-  }
-  page0.show();
-}
-
 //=====================================BOTOES TRATAMENTO==========================================
-unsigned long volumeTotal = 0;
-
 void btNutriTrPushCallback(void *ptr) {
   uint32_t ds;
   btNutriTr.getValue(&ds);
@@ -535,9 +530,10 @@ void btnRelesPushCallback(void *ptr) {
 
 void btnAtualizarPushCallback(void *ptr) {
   salvarConfiguracaoValvulas();
-  gotoPage0();
+  page0.show();
 }
 
+//==========================================CADASTRAR USUARIO=====================================
 void btnCadastrarPopCallback(void *ptr) {
   cadastroOutput.Set_font_color_pco(63488);
   char buffNome[31] = {0};
@@ -650,42 +646,8 @@ void cadastrarProfissional(String str) {
   if (iTecnico == 1)
     gravarSD(str, BDTECNICOS);
 }
+//===========================================================================================================
 
-void btnConectarPushCallback(void *ptr) {
-  char buff1[31] = {0};
-  comboRede.getText(buff1, sizeof(buff1));
-  String nomeRede(buff1);
-
-  char buffSenha[21] = {0};
-  txtSenha.getText(buffSenha, sizeof(buffSenha));
-  String senha(buffSenha);
-
-  txtConexao.setText("Conectando...");
-  conectarWifi(nomeRede, senha);
-
-  if (conectado) {
-    redeConectada = nomeRede;
-    String msg = "Conectado na rede " + nomeRede;
-    char buff2[1024];
-    msg.toCharArray(buff2, sizeof(buff2));
-    txtConexao.Set_font_color_pco(1024);
-    txtConexao.setText(buff2);
-
-    if (SD.exists("wifi.txt")) {
-      SD.remove("wifi.txt");
-    }
-    String nomeSenha = nomeRede + "\n" + senha + "\n";
-    gravarSD(nomeSenha, "wifi.txt");
-  } else {
-    txtConexao.Set_font_color_pco(63488);
-    String msg = "Falha ao conectar na rede " + nomeRede;
-    char buff3[1024];
-    msg.toCharArray(buff3, sizeof(buff3));
-    txtConexao.setText(buff3);
-    redeConectada = "";
-  }
-  txtSenha.setText("");
-}
 //---------Roda Rotina do Tratamento---------//
 void lerFatorCondicionador() {
   uint32_t valor;
@@ -735,94 +697,6 @@ bool validarTratamento() {
     return false;
 
   return true;
-}
-
-void rodaTratamento() {
-  unsigned long volumeCondicionador[7] = {0};
-  unsigned long somaVolumeCondicionador = 0;
-  unsigned long tempoReleFechado[7] = {0};
-
-  for (int i = 0; i < 7; i++) {
-    if (condicionador[i]) {
-      volumeCondicionador[i] = volumeTotal * fator[i] * 0.01;
-      somaVolumeCondicionador += volumeCondicionador[i];
-      tempoReleFechado[i] = volumeCondicionador[i] * tempoValvulaCondicionador[i];
-    }
-  }
-
-  unsigned long volumeBase = volumeTotal - somaVolumeCondicionador;
-
-  unsigned long tempoReleBaseFechado = (unsigned long)tempoValvulaBase * volumeBase;
-
-  if (tempoReleBaseFechado > 0) {
-    page4.show();
-    if (photoactive)
-      digitalWrite (RELE8_PHOTOACTIVE, LOW);
-    liberarCondicionador(RELE9_BASE, tempoReleBaseFechado);
-
-    int n = 0;
-    for (int i = 0, j = 40; i < 7; i++, j++) { // nutrition
-      if (condicionador[i] && tempoReleFechado[i] > 0) {
-        liberarCondicionador(j, tempoReleFechado[i]);
-        n++;
-      }
-    }
-    resetarRelesTratamento();
-    page5.show();//retire seu produto
-
-    gravarSD(prepararDadosSdTratamento(volumeBase, volumeCondicionador), "trat.txt");
-
-    String dadosWifi = prepararDadosWifiTratamento(n, volumeCondicionador);
-    if (wifiSerial.createTCP(hostIp, port)) {
-      reenviarDadosTemporarios();
-      delay(500);
-      enviarDadosWifi(dadosWifi);
-      wifiSerial.releaseTCP();
-    } else {
-      dadosWifi += "\n";
-      gravarSD(dadosWifi, "tmp.txt");
-    }
-  }
-  page0.show();
-}
-
-void resetarReles() {
-  digitalWrite (RELE1_REGENERANT, HIGH);
-  digitalWrite (RELE2_NUTRITION, HIGH);
-  digitalWrite (RELE3_ANTIFRISO, HIGH);
-  digitalWrite (RELE4_BIONEUTRAL, HIGH);
-  digitalWrite (RELE8_PHOTOACTIVE, HIGH);
-}
-
-void resetarRelesTratamento() {
-  digitalWrite (RELE16_NUTRI, HIGH);
-  digitalWrite (RELE14_DENSITY, HIGH);
-  digitalWrite (RELE15_REPAIR, HIGH);
-  digitalWrite (RELE13_DISCIPLINE, HIGH);
-  digitalWrite (RELE12_ANTIBREAK, HIGH);
-  digitalWrite (RELE11_GROWTH, HIGH);
-  digitalWrite (RELE10_CURLY, HIGH);
-  digitalWrite (RELE9_BASE, HIGH);
-  digitalWrite (RELE8_PHOTOACTIVE, HIGH);
-}
-
-void resetarVariaveisShampoo() {
-  opcaoShampoo = NENHUM;
-  photoactive = true;
-  volume = 0;
-  volumeShampoo.setText("");
-}
-
-void resetarVariaveisTratamento() {
-
-  for (int i = 0; i < 7; i++)
-    condicionador[i] = false;
-
-  for (int i = 0; i < 7; i++)
-    fator[i] = 0;
-
-  photoactive = true;
-  volumeTotal = 0;
 }
 
 //=========================CARTAO SD E RTC=====================================
@@ -1315,33 +1189,45 @@ bool reenviarDadosTemporarios() {
   return enviou;
 }
 
+void btnConectarPushCallback(void *ptr) {
+  char buff1[31] = {0};
+  comboRede.getText(buff1, sizeof(buff1));
+  String nomeRede(buff1);
+
+  char buffSenha[21] = {0};
+  txtSenha.getText(buffSenha, sizeof(buffSenha));
+  String senha(buffSenha);
+
+  txtConexao.setText("Conectando...");
+  conectarWifi(nomeRede, senha);
+
+  if (conectado) {
+    redeConectada = nomeRede;
+    String msg = "Conectado na rede " + nomeRede;
+    char buff2[1024];
+    msg.toCharArray(buff2, sizeof(buff2));
+    txtConexao.Set_font_color_pco(1024);
+    txtConexao.setText(buff2);
+
+    if (SD.exists("wifi.txt")) {
+      SD.remove("wifi.txt");
+    }
+    String nomeSenha = nomeRede + "\n" + senha + "\n";
+    gravarSD(nomeSenha, "wifi.txt");
+  } else {
+    txtConexao.Set_font_color_pco(63488);
+    String msg = "Falha ao conectar na rede " + nomeRede;
+    char buff3[1024];
+    msg.toCharArray(buff3, sizeof(buff3));
+    txtConexao.setText(buff3);
+    redeConectada = "";
+  }
+  txtSenha.setText("");
+}
+
 String prepararDadosWifiShampoo() {
-  String m = "profissional:";
-  m += profissional;
-  m += "_";
-  m += "comanda:";
-  m += numeroComanda;
-  m += "_";
-  m += "photo.:";
-  m += photoactive;
-  m += "_";
-  m += "numProdutos:1";
-  m += "_";
-  m += "tipo:Shampoo";
-  m += "_";
-  m += "volumeTotal:";
-  m += volume;
-  m += "_";
-  RtcDateTime now = Rtc.GetDateTime();
-  char data[11];
-  char hora[7];
-  snprintf_P(data, countof(data), PSTR("%02u/%02u/%04u"), now.Day(), now.Month(), now.Year());
-  snprintf_P(hora, countof(hora), PSTR("%02u#%02u"), now.Hour(), now.Minute());
-  m += "hora:";
-  m += hora;
-  m += "_";
-  m += "data:";
-  m += data;
+  String m = prepararDadosComum(1, volume, "Shampoo");
+  
   m += "_";
 
   switch (opcaoShampoo) {
@@ -1372,33 +1258,7 @@ String prepararDadosWifiShampoo() {
 }
 
 String prepararDadosWifiTratamento(unsigned long n, unsigned long volumeCondicionador[]) {
-  String m = "profissional:";
-  m += profissional;
-  m += "_";
-  m += "comanda:";
-  m += numeroComanda;
-  m += "_";
-  m += "photo.:";
-  m += photoactive;
-  m += "_";
-  m += "numProdutos:";
-  m += n;
-  m += "_";
-  m += "tipo:Tratamento";
-  m += "_";
-  m += "volumeTotal:";
-  m += volumeTotal;
-  RtcDateTime now = Rtc.GetDateTime();
-  char data[11];
-  char hora[7];
-  snprintf_P(data, countof(data), PSTR("%02u/%02u/%04u"), now.Day(), now.Month(), now.Year());
-  snprintf_P(hora, countof(hora), PSTR("%02u#%02u"), now.Hour(), now.Minute());
-  m += "_";
-  m += "hora:";
-  m += hora;
-  m += "_";
-  m += "data:";
-  m += data;
+  String m = prepararDadosComum(3, volumeTotal, "Tratamento");
 
   for (int i = 0, j = 5; i < 7; i++, j++) {
     if (condicionador[i]) {
@@ -1412,6 +1272,56 @@ String prepararDadosWifiTratamento(unsigned long n, unsigned long volumeCondicio
       m += "porc.:";
       m += fator[i];
     }
+  }
+  m += "&";
+  return m;
+}
+
+String prepararDadosComum(int numProdutos, unsigned long v, String tipo){
+  String m = "profissional:";
+  m += profissional;
+  m += "_";
+  m += "comanda:";
+  m += numeroComanda;
+  m += "_";
+  m += "photo.:";
+  m += photoactive;
+  m += "_";
+  m += "numProdutos:";
+  m += numProdutos;
+  m += "_";
+  m += "tipo:";
+  m += tipo;
+  m += "_";
+  m += "volumeTotal:";
+  m += v;
+  RtcDateTime now = Rtc.GetDateTime();
+  char data[11];
+  char hora[7];
+  snprintf_P(data, countof(data), PSTR("%02u/%02u/%04u"), now.Day(), now.Month(), now.Year());
+  snprintf_P(hora, countof(hora), PSTR("%02u#%02u"), now.Hour(), now.Minute());
+  m += "_";
+  m += "hora:";
+  m += hora;
+  m += "_";
+  m += "data:";
+  m += data;
+  return m;
+}
+
+String prepararDadosWifiMapping() {
+  String m = prepararDadosComum(3, volumeTotal, "Mapping");
+
+  for(int i = 4; i <=6; i++){
+    m += "_";
+    m += "idProduto:";
+    m += 4;
+    m += "_";
+    m += "vol.:";
+    m += volumeTotal/3;
+    m += "_";
+    m += "porc.:";
+    m += 33;
   }
   m += "&";
   return m;
@@ -1512,6 +1422,8 @@ void btnIniciarPopCallback(void *ptr) {
     }
     else if (opcao == TRATAMENTO)
       rodaTratamento();
+    else if (opcao == MAPPING)
+      rodaMapping();
   } else {
     txtMsg.setText("Senha nao encontrada");
   }
@@ -1525,10 +1437,9 @@ void btnTreatmentPushCallback(void *ptr) {
   resetarVariaveisTratamento();
 }
 
-void resetarPopupSenha() {
-  txtComanda.setText("");
-  txtPassword.setText("");
-  txtSenhaGerenciar.setText("");
+void btnMappingPushCallback(void *ptr) {
+  opcaoMapping=NONE;
+  page14.show();
 }
 
 void btnFecharGerenciarPopCallback(void *ptr) {
@@ -1552,7 +1463,7 @@ void btnFecharPopCallback(void *ptr) {
   else if (opcao == TRATAMENTO)
     page2.show();
 }
-//===========================================================================
+//===============================RELES============================================
 void btnRele1AtPopCallback(void *ptr) {
   salvarConfiguracaoValvula(0, rele1);
   txtMsgAt.setText("Atualizado. Aguarde...");
@@ -1639,11 +1550,11 @@ void btnRele10AtPopCallback(void *ptr) {
   txtMsgAt.setText("");
 }
 
+//=======================================USUARIOS CADASTRADOS===============================
 void bZeroPushCallback(void *ptr) {
   carregarUsuariosCadastrados();
   page13.show();
 }
-//=======================================USUARIOS CADASTRADOS===============================
 void lerCadastro(String filename, String perfil) {
   if (!isSdOk)
     return;
@@ -1674,11 +1585,196 @@ void carregarUsuariosCadastrados(){
   lerCadastro("PRO.TXT", "Profissional");  
 }
 
-//===========================================================================================
-void gotoPage0() {
+//======================================MAPPING=================================================
+void btnCurtoPushCallback(void *ptr) {
+  opcaoMapping=CURTO;
+}
+
+void btnMedioPushCallback(void *ptr) {
+  opcaoMapping=MEDIO;
+}
+
+void btnLongoPushCallback(void *ptr) {
+  opcaoMapping=LONGO;  
+}
+
+void btMixMapPushCallback(void *ptr) {
+  if (opcaoMapping == NONE) {
+    return;
+  }
+  
+  resetarPopupSenha();
+  opcao = MAPPING;
+  page11.show();
+}
+//=====================================EXECUCAO===============================================
+void rodaShampoo() {
+
+  unsigned long volShampoo = 0;
+  int rele = 0;
+  switch (opcaoShampoo) {
+    case REGENERANT:
+      rele = RELE1_REGENERANT;
+      volShampoo = (unsigned long)volume * K_valvula_0;
+      break;
+    case NUTRITION:
+      rele = RELE2_NUTRITION;
+      volShampoo = (unsigned long)volume * K_valvula_1;
+      break;
+    case ANTIFRISO:
+      rele = RELE3_ANTIFRISO;
+      volShampoo = (unsigned long)volume * K_valvula_2;
+      break;
+    case BIONEUTRAL:
+      rele = RELE4_BIONEUTRAL;
+      volShampoo = (unsigned long)volume * K_valvula_11;
+      break;
+    case NENHUM:
+      break;
+  }
+
+  unsigned long fim = millis() + volShampoo;
+
+  if (volShampoo > 0) {
+    page4.show();
+    if (photoactive)
+      digitalWrite (RELE8_PHOTOACTIVE, LOW);
+
+    digitalWrite (rele, LOW);
+    while (millis() < fim) {
+    }
+    resetarReles();
+    page5.show();//retire seu produto
+
+    gravarSD(prepararDadosSdShampoo(), "sham.txt");
+
+    enviarJson(criarMensagemJsonShampoo());
+
+    String dadosWifi = prepararDadosWifiShampoo();
+    if (wifiSerial.createTCP(hostIp, port)) {
+      reenviarDadosTemporarios();
+      delay(500);
+      enviarDadosWifi(dadosWifi);
+      wifiSerial.releaseTCP();
+    } else {
+      dadosWifi += "\n";
+      gravarSD(dadosWifi, "tmp.txt");
+    }
+  }
   page0.show();
 }
 
+void rodaTratamento() {
+  unsigned long volumeCondicionador[7] = {0};
+  unsigned long somaVolumeCondicionador = 0;
+  unsigned long tempoReleFechado[7] = {0};
+
+  for (int i = 0; i < 7; i++) {
+    if (condicionador[i]) {
+      volumeCondicionador[i] = volumeTotal * fator[i] * 0.01;
+      somaVolumeCondicionador += volumeCondicionador[i];
+      tempoReleFechado[i] = volumeCondicionador[i] * tempoValvulaCondicionador[i];
+    }
+  }
+
+  unsigned long volumeBase = volumeTotal - somaVolumeCondicionador;
+
+  unsigned long tempoReleBaseFechado = (unsigned long)tempoValvulaBase * volumeBase;
+
+  if (tempoReleBaseFechado > 0) {
+    page4.show();
+    if (photoactive)
+      digitalWrite (RELE8_PHOTOACTIVE, LOW);
+    liberarCondicionador(RELE9_BASE, tempoReleBaseFechado);
+
+    int n = 0;
+    for (int i = 0, j = 40; i < 7; i++, j++) { // nutrition
+      if (condicionador[i] && tempoReleFechado[i] > 0) {
+        liberarCondicionador(j, tempoReleFechado[i]);
+        n++;
+      }
+    }
+    resetarRelesTratamento();
+    page5.show();//retire seu produto
+
+    gravarSD(prepararDadosSdTratamento(volumeBase, volumeCondicionador), "trat.txt");
+
+    String dadosWifi = prepararDadosWifiTratamento(n, volumeCondicionador);
+    if (wifiSerial.createTCP(hostIp, port)) {
+      reenviarDadosTemporarios();
+      delay(500);
+      enviarDadosWifi(dadosWifi);
+      wifiSerial.releaseTCP();
+    } else {
+      dadosWifi += "\n";
+      gravarSD(dadosWifi, "tmp.txt");
+    }
+  }
+  page0.show();
+}
+
+void rodaMapping() {
+
+  volumeTotal = 0;
+  
+  int rele = RELE4_BIONEUTRAL;
+  
+  switch (opcaoMapping) {
+    case CURTO:
+      volumeTotal = 15;      
+      break;
+    case MEDIO:
+      volumeTotal = 24;
+      break;
+    case LONGO:
+      volumeTotal = 33;
+      break;
+    case NENHUM:
+      break;
+  }
+  
+  unsigned long volume = volumeTotal/3;
+  unsigned long volShampoo = (unsigned long)volume * K_valvula_11;
+
+  unsigned long fim = millis() + volShampoo;
+
+  if (volShampoo > 0) {
+    page4.show();
+    digitalWrite (RELE8_PHOTOACTIVE, LOW);
+
+    digitalWrite (rele, LOW);
+    while (millis() < fim) {
+    }
+  }
+  digitalWrite (rele, HIGH);
+  
+  unsigned long tempoT1 = volume * tempoValvulaCondicionador[0];
+  unsigned long tempoT2 = volume * tempoValvulaCondicionador[1];
+
+  liberarCondicionador(RELE16_NUTRI, tempoT1); // 
+  liberarCondicionador(RELE15_REPAIR, tempoT2); // 
+    
+  digitalWrite (RELE8_PHOTOACTIVE, HIGH);
+  page5.show();//retire seu produto
+
+  //gravarSD(prepararDadosSdMapping(), "sham.txt"); TODO GRAVAR NO SD DADOS MAPPING
+  //enviarJson(criarMensagemJsonShampoo()); TODO ENVIAR JSON DADOS MAPPING
+
+  String dadosWifi = prepararDadosWifiMapping();
+    if (wifiSerial.createTCP(hostIp, port)) {
+      reenviarDadosTemporarios();
+      delay(500);
+      enviarDadosWifi(dadosWifi);
+      wifiSerial.releaseTCP();
+    } else {
+      dadosWifi += "\n";
+      gravarSD(dadosWifi, "tmp.txt");
+    }
+  
+  page0.show();
+}
+
+//=============================================================================================
 void definirSaidas() {
   pinMode (RELE1_REGENERANT, OUTPUT);
   pinMode (RELE2_NUTRITION, OUTPUT);
@@ -1748,6 +1844,8 @@ NexTouch *nex_listen_list[] = {
   &btnCurto,
   &btnMedio,
   &btnLongo,
+  &btnMapping,
+  &btMixMap,
   NULL
 };
 
@@ -1810,6 +1908,11 @@ void setup() {
   btCurly.attachPush(btCurlyPushCallback, &btCurly);
   btMixTr.attachPush(btMixTrPushCallback, &btMixTr);
 
+  btMixMap.attachPush(btMixMapPushCallback, &btMixMap);
+  btnCurto.attachPush(btnCurtoPushCallback, &btnCurto);
+  btnMedio.attachPush(btnMedioPushCallback, &btnMedio);
+  btnLongo.attachPush(btnLongoPushCallback, &btnLongo);
+
   slNutriTr.attachPop(slNutriTrPopCallback);
   slRepair.attachPop(slRepairPopCallback);
   slDensity.attachPop(slDensityPopCallback);
@@ -1822,8 +1925,11 @@ void setup() {
   btPhotoactiveTr.attachPush(btPhotoactiveTrPushCallback, &btPhotoactiveTr);
 
   btnIniciar.attachPop(btnIniciarPopCallback);
+  
   btnShampoo.attachPush(btnShampooPushCallback, &btnShampoo);
   btnTreatment.attachPush(btnTreatmentPushCallback, &btnTreatment);
+  btnMapping.attachPush(btnMappingPushCallback, &btnMapping);
+  
   btnFechar.attachPop(btnFecharPopCallback);
   btnFecharGerenciar.attachPop(btnFecharGerenciarPopCallback);
   btnWifi.attachPop(btnWifiPopCallback);
