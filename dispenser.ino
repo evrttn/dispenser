@@ -40,7 +40,7 @@ NexButton btnShampoo = NexButton(0, 1, "bt0");
 NexButton btnTreatment = NexButton(0, 2, "bt1");
 NexButton btnWifi = NexButton(0, 5, "btWifi");
 NexButton btnCadastro = NexButton(0, 4, "btnCadastro");
-NexButton btnMapping = NexButton(0, 7, "bt2");
+NexButton btnMapping = NexButton(0, 6, "bt2");
 
 // page1
 NexDSButton btRegenerant = NexDSButton(1, 5, "bt1");
@@ -609,8 +609,9 @@ bool procurarSenha(String password, String filename) {
     while (arquivo.available()) {
       String nomeSenha = arquivo.readStringUntil('\n');
       int idxSeparador = nomeSenha.lastIndexOf(";");
-      String senha = nomeSenha.substring(idxSeparador + 1);
-      profissional = nomeSenha.substring(0, idxSeparador);
+      int iniSeparador = nomeSenha.indexOf(";");
+      String senha = nomeSenha.substring(iniSeparador+1, idxSeparador);
+      profissional = nomeSenha.substring(0, iniSeparador);
       if (password.equals(senha)) {
         encontrou = true;
         break;
@@ -1391,39 +1392,6 @@ String getNomeRede(char * ptr) {
 }
 
 //============================================================================
-void btnIniciarPopCallback(void *ptr) {
-  char buff[11] = {0};
-  txtComanda.getText(buff, sizeof(buff));
-  String strComanda(buff);
-  numeroComanda = strComanda;
-
-  char buffSenha[11] = {0};
-  txtPassword.getText(buffSenha, sizeof(buffSenha));
-  String strSenha(buffSenha);
-
-  if (strComanda == NULL || strComanda.equals("")) {
-    txtMsg.setText("Comanda obrigatoria");
-    return;
-  }
-
-  if (strSenha == NULL || strSenha.equals("")) {
-    txtMsg.setText("Senha obrigatoria");
-    return;
-  }
-
-  if (procurarSenha(strSenha, BDPROFISSIONAIS)) {
-    resetarPopupSenha();
-    if (opcao == SHAMPOO) {
-      rodaShampoo();
-    }
-    else if (opcao == TRATAMENTO)
-      rodaTratamento();
-    else if (opcao == MAPPING)
-      rodaMapping();
-  } else {
-    txtMsg.setText("Senha nao encontrada");
-  }
-}
 
 void btnShampooPushCallback(void *ptr) {
   resetarVariaveisShampoo();
@@ -1453,6 +1421,7 @@ void btnInativarPushCallback(void *ptr, int pos) {
   if (!isSdOk)
     return;
 
+  /*
   String nomeSenhaStatus = "";
   File arquivo = SD.open(filename);
   if (arquivo) {
@@ -1478,6 +1447,7 @@ void btnInativarPushCallback(void *ptr, int pos) {
     Serial.print(F("error opening "));
     Serial.println(filename);
   }
+  */
 }
 
 void btnFecharPopCallback(void *ptr) {
@@ -1578,9 +1548,9 @@ void btnRele10AtPopCallback(void *ptr) {
 }
 
 //=======================================USUARIOS CADASTRADOS===============================
-void btnGerenciarPushCallback(void *ptr) {
-  carregarUsuariosCadastrados();
+void btnGerenciarPopCallback(void *ptr) {  
   page13.show();
+  carregarUsuariosCadastrados();
 }
 void lerCadastro(String filename, String perfil) {
   if (!isSdOk)
@@ -1594,9 +1564,9 @@ void lerCadastro(String filename, String perfil) {
       int fimSeparador = nomeSenhaStatus.lastIndexOf(";");
       String senha = nomeSenhaStatus.substring(iniSeparador + 1, fimSeparador);
       String profissional = nomeSenhaStatus.substring(0, iniSeparador);
-    String status = nomeSenhaStatus.substring(fimSeparador + 1);
-    status = status.equals("A")?"Ativo":"Inativo";
-      profissional = profissional + "^" + perfil + "^" + status;
+    String s = nomeSenhaStatus.substring(fimSeparador + 1);
+    s = s.equals("A")?"Ativo":"Inativo";
+      profissional = profissional + "^" + perfil + "^"+s;
       Serial.println(profissional);      
       tabela.insert(profissional);
     }
@@ -1667,13 +1637,15 @@ void rodaShampoo() {
 
   if (volShampoo > 0) {
     page4.show();
-    if (photoactive)
+    if (photoactive){
       digitalWrite (RELE8_PHOTOACTIVE, LOW);
+    }
 
     digitalWrite (rele, LOW);
     while (millis() < fim) {
     }
     resetarReles();
+    
     page5.show();//retire seu produto
 
     gravarSD(prepararDadosSdShampoo(), "sham.txt");
@@ -1716,10 +1688,11 @@ void rodaTratamento() {
     if (photoactive)
       digitalWrite (RELE8_PHOTOACTIVE, LOW);
     liberarCondicionador(RELE9_BASE, tempoReleBaseFechado);
-
+    
     int n = 0;
     for (int i = 0, j = 40; i < 7; i++, j++) { // nutrition
       if (condicionador[i] && tempoReleFechado[i] > 0) {
+        delay(500);
         liberarCondicionador(j, tempoReleFechado[i]);
         n++;
       }
@@ -1769,22 +1742,22 @@ void rodaMapping() {
 
   unsigned long fim = millis() + volShampoo;
 
-  if (volShampoo > 0) {
-    page4.show();
+  page4.show();
     digitalWrite (RELE8_PHOTOACTIVE, LOW);
 
     digitalWrite (rele, LOW);
     while (millis() < fim) {
     }
-  }
   digitalWrite (rele, HIGH);
+  delay(500);
   
   unsigned long tempoT1 = volume * tempoValvulaCondicionador[0];
   unsigned long tempoT2 = volume * tempoValvulaCondicionador[1];
 
   liberarCondicionador(RELE16_NUTRI, tempoT1); // 
+  delay(500);
   liberarCondicionador(RELE15_REPAIR, tempoT2); // 
-    
+  delay(500);  
   digitalWrite (RELE8_PHOTOACTIVE, HIGH);
   page5.show();//retire seu produto
 
@@ -1803,6 +1776,40 @@ void rodaMapping() {
     }
   
   page0.show();
+}
+
+void btnIniciarPopCallback(void *ptr) {
+  char buff[11] = {0};
+  txtComanda.getText(buff, sizeof(buff));
+  String strComanda(buff);
+  numeroComanda = strComanda;
+
+  char buffSenha[11] = {0};
+  txtPassword.getText(buffSenha, sizeof(buffSenha));
+  String strSenha(buffSenha);
+
+  if (strComanda == NULL || strComanda.equals("")) {
+    txtMsg.setText("Comanda obrigatoria");
+    return;
+  }
+
+  if (strSenha == NULL || strSenha.equals("")) {
+    txtMsg.setText("Senha obrigatoria");
+    return;
+  }
+
+  if (procurarSenha(strSenha, BDPROFISSIONAIS)) {
+    resetarPopupSenha();
+    if (opcao == SHAMPOO) {
+      rodaShampoo();
+    }
+    else if (opcao == TRATAMENTO)
+      rodaTratamento();
+    else if (opcao == MAPPING)
+      rodaMapping();
+  } else {
+    txtMsg.setText("Senha nao encontrada");
+  }
 }
 
 //=============================================================================================
@@ -1981,7 +1988,7 @@ void setup() {
   btnRele16At.attachPop(btnRele16AtPopCallback);
 
   btnCadastro.attachPush(btnCadastroPushCallback, &btnCadastro);
-  btnGerenciar.attachPush(btnGerenciarPushCallback, &btnGerenciar);
+  btnGerenciar.attachPop(btnGerenciarPopCallback);
   btnInativar.attachPush(btnInativarPushCallback, &btnInativar);
   
   
