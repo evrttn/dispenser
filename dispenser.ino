@@ -42,8 +42,6 @@ NexButton btnWifi = NexButton(0, 5, "btWifi");
 NexButton btnCadastro = NexButton(0, 4, "btnCadastro");
 NexButton btnMapping = NexButton(0, 7, "bt2");
 
-NexButton bZero = NexButton(0, 6, "b0");
-
 // page1
 NexDSButton btRegenerant = NexDSButton(1, 5, "bt1");
 NexDSButton btNutrition = NexDSButton(1, 6, "bt2");
@@ -121,6 +119,7 @@ NexButton btnCadastrar = NexButton(8, 3, "btnCadastrar");
 NexCheckbox cProfissional = NexCheckbox(8, 14, "c2");
 NexCheckbox cGerente = NexCheckbox(8, 11, "c0");
 NexCheckbox cTecnico = NexCheckbox(8, 12, "c1");
+NexButton btnGerenciar = NexButton(8, 17, "b0");
 
 //page8 conexao com a internet
 NexComboBox comboRede = NexComboBox(9, 10, "txtRede");//Funcionou com 9.
@@ -168,7 +167,6 @@ NexPage page12 = NexPage(12, 0, "page10");
 NexPage page8 = NexPage(8, 0, "page7");
 NexPage page13 = NexPage(13, 0, "page11");
 NexPage page14 = NexPage(14, 0, "page12");
-
 
 //variaveis shampoo
 enum shampoo {REGENERANT, NUTRITION, ANTIFRISO, BIONEUTRAL, NENHUM};
@@ -590,7 +588,7 @@ void btnCadastrarPopCallback(void *ptr) {
       cadastroOutput.setText("Senha invalida.");
       return;
     }
-  cadastrarProfissional(strNomeProfissional + ";" + strSenhaProfissional + "\n");
+  cadastrarProfissional(strNomeProfissional + ";" + strSenhaProfissional + ";"+"A"+"\n");
   cadastroOutput.Set_font_color_pco(1024);
   cadastroOutput.setText("Profissional cadastrado(a)");
   nomeProfissional.setText("");
@@ -647,7 +645,6 @@ void cadastrarProfissional(String str) {
     gravarSD(str, BDTECNICOS);
 }
 //===========================================================================================================
-
 //---------Roda Rotina do Tratamento---------//
 void lerFatorCondicionador() {
   uint32_t valor;
@@ -1452,6 +1449,37 @@ void btnCadastroPushCallback(void *ptr) {
   page12.show();
 }
 
+void btnInativarPushCallback(void *ptr, int pos) {
+  if (!isSdOk)
+    return;
+
+  String nomeSenhaStatus = "";
+  File arquivo = SD.open(filename);
+  if (arquivo) {
+  for(int i = 0; i < pos; i++){
+      nomeSenhaStatus = arquivo.readStringUntil('\n');
+  }
+    //atualizar tabela
+      int fimSeparador = nomeSenhaStatus.lastIndexOf(";");
+    String s = nomeSenhaStatus.substring(fimSeparador + 1);
+    String status = s.equals("A")?"Ativo":"Inativo";
+      profissional = profissional + "^" + perfil + "^" + status;
+      Serial.println(profissional);     
+    
+      //tabela.update(profissional); TODO usar up(date)
+
+    //posicao atual
+    unsigned long p = arquivo.position();
+    arquivo.seek(p-1);
+    arquivo.write(s.equals("A")?'I':'A');   
+    }
+    arquivo.close();
+  } else {
+    Serial.print(F("error opening "));
+    Serial.println(filename);
+  }
+}
+
 void btnFecharPopCallback(void *ptr) {
   resetarVariaveisShampoo();
   resetarVariaveisTratamento();
@@ -1550,7 +1578,7 @@ void btnRele10AtPopCallback(void *ptr) {
 }
 
 //=======================================USUARIOS CADASTRADOS===============================
-void bZeroPushCallback(void *ptr) {
+void btnGerenciarPushCallback(void *ptr) {
   carregarUsuariosCadastrados();
   page13.show();
 }
@@ -1561,11 +1589,14 @@ void lerCadastro(String filename, String perfil) {
   File arquivo = SD.open(filename);
   if (arquivo) {
     while (arquivo.available()) {
-      String nomeSenha = arquivo.readStringUntil('\n');
-      int idxSeparador = nomeSenha.lastIndexOf(";");
-      String senha = nomeSenha.substring(idxSeparador + 1);
-      String profissional = nomeSenha.substring(0, idxSeparador);
-      profissional = profissional + "^" + perfil;
+      String nomeSenhaStatus = arquivo.readStringUntil('\n');
+    int iniSeparador = nomeSenhaStatus.indexOf(";");
+      int fimSeparador = nomeSenhaStatus.lastIndexOf(";");
+      String senha = nomeSenhaStatus.substring(iniSeparador + 1, fimSeparador);
+      String profissional = nomeSenhaStatus.substring(0, iniSeparador);
+    String status = nomeSenhaStatus.substring(fimSeparador + 1);
+    status = status.equals("A")?"Ativo":"Inativo";
+      profissional = profissional + "^" + perfil + "^" + status;
       Serial.println(profissional);      
       tabela.insert(profissional);
     }
@@ -1738,22 +1769,20 @@ void rodaMapping() {
 
   unsigned long fim = millis() + volShampoo;
 
- 
+  if (volShampoo > 0) {
     page4.show();
     digitalWrite (RELE8_PHOTOACTIVE, LOW);
 
     digitalWrite (rele, LOW);
     while (millis() < fim) {
     }
-  
+  }
   digitalWrite (rele, HIGH);
-  delay(100);
   
   unsigned long tempoT1 = volume * tempoValvulaCondicionador[0];
   unsigned long tempoT2 = volume * tempoValvulaCondicionador[1];
 
   liberarCondicionador(RELE16_NUTRI, tempoT1); // 
-  delay(100);
   liberarCondicionador(RELE15_REPAIR, tempoT2); // 
     
   digitalWrite (RELE8_PHOTOACTIVE, HIGH);
@@ -1842,12 +1871,13 @@ NexTouch *nex_listen_list[] = {
   &btnProximo,
   &btnFecharGerenciar,
   &btnCadastro,
-  &bZero,
+  &btnGerenciar,
   &btnCurto,
   &btnMedio,
   &btnLongo,
   &btnMapping,
   &btMixMap,
+  &btnInativar,
   NULL
 };
 
@@ -1951,9 +1981,10 @@ void setup() {
   btnRele16At.attachPop(btnRele16AtPopCallback);
 
   btnCadastro.attachPush(btnCadastroPushCallback, &btnCadastro);
-
-  bZero.attachPush(bZeroPushCallback, &bZero);
-
+  btnGerenciar.attachPush(btnGerenciarPushCallback, &btnGerenciar);
+  btnInativar.attachPush(btnInativarPushCallback, &btnInativar);
+  
+  
   page0.show();
 }
 
