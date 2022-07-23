@@ -940,7 +940,7 @@ String criarMensagemJsonTratamento(unsigned long n, unsigned long volumeCondicio
   doc["nomeUsuario"] = profissional;
   doc["numero"] = numeroComanda;
   doc["photoactive"] = photoactive;
-  doc["volumeTotal"] = volume;
+  doc["volumeTotal"] = volumeTotal;
   doc["tipo"] = 1;
 
   RtcDateTime now = Rtc.GetDateTime();
@@ -953,8 +953,8 @@ String criarMensagemJsonTratamento(unsigned long n, unsigned long volumeCondicio
   JsonArray items = doc.createNestedArray("items");
 
   for (int i = 0, j = 5; i < 7; i++, j++) {
-    JsonObject objItems = items.createNestedObject();
     if (condicionador[i]) {
+      JsonObject objItems = items.createNestedObject();
       objItems["codProduto"] = j;
       objItems["volume"] = volumeCondicionador[i];
       objItems["porcentagem"] = fator[i];
