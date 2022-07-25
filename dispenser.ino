@@ -1421,33 +1421,70 @@ void btnInativarPushCallback(void *ptr, int pos) {
   if (!isSdOk)
     return;
 
-  /*
-  String nomeSenhaStatus = "";
-  File arquivo = SD.open(filename);
-  if (arquivo) {
-  for(int i = 0; i < pos; i++){
-      nomeSenhaStatus = arquivo.readStringUntil('\n');
-  }
-    //atualizar tabela
-      int fimSeparador = nomeSenhaStatus.lastIndexOf(";");
-    String s = nomeSenhaStatus.substring(fimSeparador + 1);
-    String status = s.equals("A")?"Ativo":"Inativo";
-      profissional = profissional + "^" + perfil + "^" + status;
-      Serial.println(profissional);     
-    
-      //tabela.update(profissional); TODO usar up(date)
+  char buff1[81] = {0};
+  tabela.getText(buff1, sizeof(buff1));
+  String nomeSenhaStatus(buff1);
 
-    //posicao atual
-    unsigned long p = arquivo.position();
-    arquivo.seek(p-1);
-    arquivo.write(s.equals("A")?'I':'A');   
-    }
+  int iniSeparador = nomeSenhaStatus.indexOf("^");
+  int fimSeparador = nomeSenhaStatus.lastIndexOf("^");
+
+  String perfil = nomeSenhaStatus.substring(iniSeparador + 1, fimSeparador);
+  String usuario = nomeSenhaStatus.substring(0, iniSeparador);
+    
+  String oldStatus = nomeSenhaStatus.substring(fimSeparador+1);
+  String newStatus = oldStatus.equals("Ativo")?"Inativo":"Ativo";
+  String atualizado = nomeSenhaStatus.substring(0, fimSeparador+1) + newStatus;
+
+  //atualiza display
+  uint32_t index;
+  tabela.getValue(&index);
+  tabela.up(atualizado, index);
+  
+  //atualiza arquivo 
+  File arquivo, copia;
+
+  String filename = "";
+  if(perfil.equals("Tecnico"))
+    filename = BDTECNICOS;
+  else if(perfil.equals("Gerente"))
+    filename = BDGERENTES;
+  else if(perfil.equals("Profissional"))
+    filename = BDPROFISSIONAIS;
+
+  unsigned long posicao = 0;
+  String dados = "";
+  
+  arquivo = SD.open(filename, FILE_READ);
+  if (arquivo) {
+    
+    while (arquivo.available()) {
+      dados = arquivo.readStringUntil('\n');
+      int idxSeparador = dados.indexOf(";");      
+      String nome = dados.substring(0, idxSeparador);
+      if(usuario.equals(nome)){
+        char s = dados.charAt(dados.length()-1);
+        if(s == 'A')
+           dados.setCharAt(dados.length()-1, 'I');
+        else 
+           dados.setCharAt(dados.length()-1, 'A');
+
+        posicao = arquivo.position() - dados.length();
+        break;
+      }
+    }    
     arquivo.close();
+
+    arquivo = SD.open(filename, FILE_WRITE);                   
+    arquivo.seek(0);
+    arquivo.write(dados.c_str());
+    arquivo.flush();
+    arquivo.close();    
+    
+    Serial.print(F("escreveu: !!!!"));
+    Serial.println(dados);    
   } else {
-    Serial.print(F("error opening "));
-    Serial.println(filename);
+    Serial.print(F("error opening file"));
   }
-  */
 }
 
 void btnFecharPopCallback(void *ptr) {
