@@ -1421,6 +1421,7 @@ void btnInativarPushCallback(void *ptr, int pos) {
   if (!isSdOk)
     return;
 
+  //atualiza display
   char buff1[81] = {0};
   tabela.getText(buff1, sizeof(buff1));
   String nomeSenhaStatus(buff1);
@@ -1429,18 +1430,19 @@ void btnInativarPushCallback(void *ptr, int pos) {
   int fimSeparador = nomeSenhaStatus.lastIndexOf("^");
 
   String perfil = nomeSenhaStatus.substring(iniSeparador + 1, fimSeparador);
+  Serial.print("perfil: ");  
+  Serial.println(perfil);  
   String usuario = nomeSenhaStatus.substring(0, iniSeparador);
-    
+   
   String oldStatus = nomeSenhaStatus.substring(fimSeparador+1);
   String newStatus = oldStatus.equals("Ativo")?"Inativo":"Ativo";
   String atualizado = nomeSenhaStatus.substring(0, fimSeparador+1) + newStatus;
-
-  //atualiza display
+ 
   uint32_t index;
   tabela.getValue(&index);
   tabela.up(atualizado, index);
-  
-  //atualiza arquivo 
+ 
+  //atualiza arquivo
   File arquivo, copia;
 
   String filename = "";
@@ -1451,41 +1453,52 @@ void btnInativarPushCallback(void *ptr, int pos) {
   else if(perfil.equals("Profissional"))
     filename = BDPROFISSIONAIS;
 
-  unsigned long posicao = 0;
   String dados = "";
-  
+ 
   arquivo = SD.open(filename, FILE_READ);
+  copia = SD.open("bkp.txt", FILE_WRITE);
   if (arquivo) {
-    
+   
     while (arquivo.available()) {
       dados = arquivo.readStringUntil('\n');
-      int idxSeparador = dados.indexOf(";");      
+      int idxSeparador = dados.indexOf(";");
+      int lastSeparador = dados.lastIndexOf(";");
+             
       String nome = dados.substring(0, idxSeparador);
       if(usuario.equals(nome)){
-        char s = dados.charAt(dados.length()-1);
+        char s = dados.charAt(lastSeparador+1);
         if(s == 'A')
-           dados.setCharAt(dados.length()-1, 'I');
-        else 
-           dados.setCharAt(dados.length()-1, 'A');
-
-        posicao = arquivo.position() - dados.length();
-        break;
+           dados.setCharAt(lastSeparador+1, 'I');
+        else
+           dados.setCharAt(lastSeparador+1, 'A');
       }
+      dados += "\n";
+      copia.print(dados);  
     }    
     arquivo.close();
+    copia.close();
 
-    arquivo = SD.open(filename, FILE_WRITE);                   
-    arquivo.seek(0);
-    arquivo.write(dados.c_str());
-    arquivo.flush();
-    arquivo.close();    
-    
+    SD.remove(filename);
+
+    arquivo = SD.open(filename, FILE_WRITE);
+    copia = SD.open("bkp.txt", FILE_READ);
+
+    size_t n;  
+    uint8_t buf[64];
+    while ((n = copia.read(buf, sizeof(buf))) > 0) {
+    arquivo.write(buf, n);
+    }
+    arquivo.close();
+    copia.close();
+    SD.remove("bkp.txt");
+   
     Serial.print(F("escreveu: !!!!"));
     Serial.println(dados);    
   } else {
     Serial.print(F("error opening file"));
   }
 }
+
 
 void btnFecharPopCallback(void *ptr) {
   resetarVariaveisShampoo();
@@ -1601,8 +1614,8 @@ void lerCadastro(String filename, String perfil) {
       int fimSeparador = nomeSenhaStatus.lastIndexOf(";");
       String senha = nomeSenhaStatus.substring(iniSeparador + 1, fimSeparador);
       String profissional = nomeSenhaStatus.substring(0, iniSeparador);
-    String s = nomeSenhaStatus.substring(fimSeparador + 1);
-    s = s.equals("A")?"Ativo":"Inativo";
+    String s = nomeSenhaStatus.substring(fimSeparador + 1, fimSeparador + 2).equals("A")?"Ativo":"Inativo";
+
       profissional = profissional + "^" + perfil + "^"+s;
       Serial.println(profissional);      
       tabela.insert(profissional);
