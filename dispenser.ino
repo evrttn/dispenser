@@ -610,9 +610,12 @@ bool procurarSenha(String password, String filename) {
       String nomeSenha = arquivo.readStringUntil('\n');
       int idxSeparador = nomeSenha.lastIndexOf(";");
       int iniSeparador = nomeSenha.indexOf(";");
+      
       String senha = nomeSenha.substring(iniSeparador+1, idxSeparador);
       profissional = nomeSenha.substring(0, iniSeparador);
-      if (password.equals(senha)) {
+      char s = nomeSenha.charAt(idxSeparador+1);
+ 
+      if (password.equals(senha) && s == 'A') {
         encontrou = true;
         break;
       }
@@ -626,6 +629,7 @@ bool procurarSenha(String password, String filename) {
     profissional = "";
   return encontrou;
 }
+
 
 void cadastrarProfissional(String str) {
   uint32_t iProfissional;
