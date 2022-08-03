@@ -211,8 +211,9 @@ const String BDPROFISSIONAIS = "PRO.TXT";
 const String BDGERENTES = "GER.TXT";
 const String BDTECNICOS = "TEC.TXT";
 
-//=======================CODIGOS================
-
+//=======================CODIGOS===============
+String codMaquina = "";
+String codSalao = "";
 //=======================VOLUMES===============
 unsigned long volume = 0;
 unsigned long volumeTotal = 0;
@@ -886,12 +887,33 @@ void btnGravarPopCallback(void *ptr) {
 
   txtConexao.setText("IP gravado");
 }
+
+void lerDadosBasicos(){
+   if (!isSdOk)
+    return;
+
+  File myFile = SD.open("INF.txt");
+  if (myFile) {
+    String info = myFile.readStringUntil('\n');
+    int idxSeparador = info.indexOf(":");
+    codMaquina = info.substring(idxSeparador+1);
+
+    info = myFile.readStringUntil('\n');
+    idxSeparador = info.indexOf(":");
+    codSalao = info.substring(idxSeparador+1);
+    
+    myFile.close();
+  } else {
+    Serial.print(F("error opening "));
+    Serial.println(F("INF.txt"));
+  }
+}
 //==========================================JSON===========================================================
 String criarMensagemJsonShampoo() {
   StaticJsonDocument<200> doc;
-  doc["codMaquina"] = 1;
-  doc["codSalao"] = 1;
-  doc["codUsuario"] = 1;
+  doc["codMaquina"] = codMaquina;
+  doc["codSalao"] = codSalao;
+  doc["codUsuario"] = 1; //TODO
   doc["nomeUsuario"] = profissional;
   doc["numero"] = numeroComanda;
   doc["photoactive"] = photoactive;
@@ -938,9 +960,9 @@ String criarMensagemJsonShampoo() {
 
 String criarMensagemJsonTratamento(unsigned long n, unsigned long volumeCondicionador[]) {
   StaticJsonDocument<200> doc;
-  doc["codMaquina"] = 1;
-  doc["codSalao"] = 1;
-  doc["codUsuario"] = 1;
+  doc["codMaquina"] = codMaquina;
+  doc["codSalao"] = codSalao;
+  doc["codUsuario"] = 1; //TODO
   doc["nomeUsuario"] = profissional;
   doc["numero"] = numeroComanda;
   doc["photoactive"] = photoactive;
@@ -1369,6 +1391,7 @@ void buscarRedesDisponiveis() {
   pt = strtok(buff, "+");
   while (pt) {
     String r = getNomeRede(pt);
+    Serial.println(r);
     if (r.length() > 0)
       redes += r;
     pt = strtok(NULL, "+");
@@ -1959,6 +1982,8 @@ void setup() {
   initRTC();
   desconectarWifi(); //modulo conecta na ultima rede assim que ligado
   lerIpComputadorRemoto();
+
+  lerDadosBasicos();
 
   msgLoading.setText("Conectando...");
   iniciarWifi();
