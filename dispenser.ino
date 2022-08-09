@@ -1170,7 +1170,7 @@ void conectarWifi(String nomeRede, String senha) {
 }
 
 void desconectarWifi() {
-  wifiSerial.leaveAP();
+  wifiSerial.leaveAP();  
 }
 
 void enviarDadosWifi(String msg) {
@@ -1213,6 +1213,10 @@ bool reenviarDadosTemporarios() {
 }
 
 void btnConectarPushCallback(void *ptr) {
+//  if(conectado){
+//    desconectarWifi();
+//  }
+  
   char buff1[31] = {0};
   comboRede.getText(buff1, sizeof(buff1));
   String nomeRede(buff1);
@@ -1222,7 +1226,9 @@ void btnConectarPushCallback(void *ptr) {
   String senha(buffSenha);
 
   txtConexao.setText("Conectando...");
-  conectarWifi(nomeRede, senha);
+  String n = nomeRede.substring(0, nomeRede.indexOf("\r")); //nextion coloca \r no final da string
+  String s = senha.substring(0, senha.indexOf("\r"));
+  conectarWifi(n, s);
 
   if (conectado) {
     redeConectada = nomeRede;
@@ -1235,7 +1241,7 @@ void btnConectarPushCallback(void *ptr) {
     if (SD.exists("wifi.txt")) {
       SD.remove("wifi.txt");
     }
-    String nomeSenha = nomeRede + "\n" + senha + "\n";
+    String nomeSenha = n + "\n" + s + "\n";
     gravarSD(nomeSenha, "wifi.txt");
   } else {
     txtConexao.Set_font_color_pco(63488);
@@ -1354,13 +1360,14 @@ void btnWifiPopCallback(void *ptr) {
   page9.show();
   txtIP.setText("");
   txtSenha.setText("");
-
+  comboRede.setText("");
+  
   txtConexao.setText("Procurando redes wifi...");
   buscarRedesDisponiveis();
 
   txtConexao.setText("Lendo IP remoto...");
   lerIpComputadorRemoto();
-
+//
   txtConexao.setText("Verificando conexao...");
   String ip = "8.8.8.8";
   bool pingou = wifiSerial.ping(ip);
@@ -1374,7 +1381,6 @@ void btnWifiPopCallback(void *ptr) {
     txtConexao.Set_font_color_pco(63488);
     txtConexao.setText("Desconectado");
     redeConectada = "";
-    comboRede.setText("");
   }
 
 }
