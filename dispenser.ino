@@ -120,6 +120,7 @@ NexCheckbox cProfissional = NexCheckbox(8, 14, "c2");
 NexCheckbox cGerente = NexCheckbox(8, 11, "c0");
 NexCheckbox cTecnico = NexCheckbox(8, 12, "c1");
 NexButton btnGerenciar = NexButton(8, 17, "b0");
+NexText txtTecnico = NexText(8, 13, "t9");
 
 //page8 conexao com a internet
 NexComboBox comboRede = NexComboBox(9, 10, "txtRede");//Funcionou com 9.
@@ -210,6 +211,7 @@ String numeroComanda = "";
 const String BDPROFISSIONAIS = "PRO.TXT";
 const String BDGERENTES = "GER.TXT";
 const String BDTECNICOS = "TEC.TXT";
+const String BDMASTER = "MTR.TXT";
 
 //=======================CODIGOS===============
 String codMaquina = "";
@@ -512,7 +514,13 @@ void btnProximoPopCallback(void *ptr) {
       txtMsgGerenciar.setText("Senha nao encontrada");
     }
   } else if (opcao == CADASTRO) {
-    if (procurarSenha(strSenha, BDGERENTES)) {
+    if (procurarSenha(strSenha, BDMASTER)) {
+      txtTecnico.setOpaqueness(127);
+      cTecnico.setOpaqueness(127);
+      resetarPopupSenha();
+      page8.show();
+    }
+    else if (procurarSenha(strSenha, BDGERENTES)) {
       resetarPopupSenha();
       page8.show();
     } else {
@@ -1718,7 +1726,7 @@ void rodaShampoo() {
 
   unsigned long fim = millis() + volShampoo;
 
-  if (volShampoo > 0) {
+  if (volShampoo > 0 && volume < 50) {
     page4.show();
     if (photoactive){
       digitalWrite (RELE8_PHOTOACTIVE, LOW);
@@ -1768,7 +1776,7 @@ void rodaTratamento() {
 
   if (tempoReleBaseFechado > 0) {
     page4.show();
-    if (photoactive)
+    if (photoactive && volumeTotal < 50)
       digitalWrite (RELE8_PHOTOACTIVE, LOW);
     liberarCondicionador(RELE9_BASE, tempoReleBaseFechado);
     
