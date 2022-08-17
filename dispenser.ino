@@ -1151,7 +1151,7 @@ void conectarWifi(String nomeRede, String senha) {
   wifiSerial.restart();
   conectado = false;
 
-  int tentativas = 5;
+  int tentativas = 3;
   for (int i = 0; i < tentativas; i++) {
     if (wifiSerial.setOprToStation()) {
       Serial.print(F("to station ok\r\n"));
@@ -1192,12 +1192,18 @@ void iniciarWifi() {
   if (SD.exists(arquivo)) {
     File forigem = SD.open(arquivo);
     if (forigem) {
-      nomeRede = forigem.readStringUntil('\n');
-      senha = forigem.readStringUntil('\n');
+      while (forigem.available()) {
+        nomeRede = forigem.readStringUntil('\n');
+        senha = forigem.readStringUntil('\n');
+        
+        conectarWifi(nomeRede, senha);
+        if (conectado){
+          redeConectada = nomeRede;
+          break;
+        }
+      }
+
       forigem.close();
-      conectarWifi(nomeRede, senha);
-      if (conectado)
-        redeConectada = nomeRede;
     }
   }
 }
@@ -1221,10 +1227,7 @@ bool reenviarDadosTemporarios() {
 }
 
 void btnConectarPushCallback(void *ptr) {
-//  if(conectado){
-//    desconectarWifi();
-//  }
-  
+ 
   char buff1[31] = {0};
   comboRede.getText(buff1, sizeof(buff1));
   String nomeRede(buff1);
