@@ -34,6 +34,9 @@ ESP8266 wifiSerial(Serial1, 115200);
 
 #define QTDVALVULAS 12
 
+#define PIC_CONECTADO 18
+#define PIC_DESCONECTADO 19
+
 // page0
 NexButton btnReles = NexButton(0, 3, "btnReles");
 NexButton btnShampoo = NexButton(0, 1, "bt0");
@@ -41,6 +44,7 @@ NexButton btnTreatment = NexButton(0, 2, "bt1");
 NexButton btnWifi = NexButton(0, 5, "btWifi");
 NexButton btnCadastro = NexButton(0, 4, "btnCadastro");
 NexButton btnMapping = NexButton(0, 6, "bt2");
+NexPicture picWifi = NexPicture(0, 7, "p0");
 
 // page1
 NexDSButton btRegenerant = NexDSButton(1, 5, "bt1");
@@ -916,6 +920,30 @@ void lerDadosBasicos(){
     Serial.println(F("INF.txt"));
   }
 }
+
+bool procurarRede(String rede, String senha, String filename) {
+  bool encontrou = false;
+  if (!isSdOk)
+    return encontrou;
+
+  File arquivo = SD.open(filename);
+  if (arquivo) {
+    while (arquivo.available()) {
+      String redeNome = arquivo.readStringUntil('\n');      
+      String redeSenha = arquivo.readStringUntil('\n');
+ 
+      if (rede.equals(redeNome) && senha.equals(redeSenha)) {
+        encontrou = true;
+        break;
+      }
+    }
+    arquivo.close();
+  } else {
+    Serial.print(F("error opening "));
+    Serial.println(filename);
+  }
+  return encontrou;
+}
 //==========================================JSON===========================================================
 String criarMensagemJsonShampoo() {
   StaticJsonDocument<200> doc;
@@ -999,6 +1027,50 @@ String criarMensagemJsonTratamento(unsigned long n, unsigned long volumeCondicio
   Serial.println("DADOS:");
   Serial.println(json);
   return json;
+}
+
+String criarMensagemJsonMapping() {
+  StaticJsonDocument<200> doc;
+  doc["codMaquina"] = codMaquina;
+  doc["codSalao"] = codSalao;
+  doc["codUsuario"] = 1; //TODO
+  doc["nomeUsuario"] = profissional;
+  doc["numero"] = numeroComanda;
+  doc["photoactive"] = photoactive;
+  doc["tipo"] = 2;
+
+  RtcDateTime now = Rtc.GetDateTime();
+  char data[11];
+  char hora[9];
+  snprintf_P(data, countof(data), PSTR("%04u-%02u-%02u"), now.Year(), now.Month(), now.Day());
+  snprintf_P(hora, countof(hora), PSTR("%02u:%02u:%02u"), now.Hour(), now.Minute(), now.Second());
+  doc["data"] = String(data)+" "+String(hora);
+
+  switch (opcaoMapping) {
+    case CURTO:
+      volume = 15;      
+      break;
+    case MEDIO:
+      volume = 24;
+      break;
+    case LONGO:
+      volume = 33;
+      break;
+    case NENHUM:
+      break;
+  }
+  doc["volumeTotal"] = volume;
+   
+  JsonArray items = doc.createNestedArray("items");  
+  for(int i = 4; i < 7; i++){
+    JsonObject objItems = items.createNestedObject();
+    objItems["codProduto"] = i;
+    objItems["volume"] = volume / 3;
+    objItems["porcentagem"] = 33;
+  }
+  String dados = "";  
+  serializeJson(doc, dados);  
+  return dados;
 }
 
 void enviarJson(String data)
@@ -1249,11 +1321,10 @@ void btnConectarPushCallback(void *ptr) {
     txtConexao.Set_font_color_pco(1024);
     txtConexao.setText(buff2);
 
-    if (SD.exists("wifi.txt")) {
-      SD.remove("wifi.txt");
+    if(procurarRede(n, s, "wifi.txt")){
+      String nomeSenha = n + "\n" + s + "\n";
+      gravarSD(nomeSenha, "wifi.txt");
     }
-    String nomeSenha = n + "\n" + s + "\n";
-    gravarSD(nomeSenha, "wifi.txt");
   } else {
     txtConexao.Set_font_color_pco(63488);
     String msg = "Falha ao conectar na rede " + nomeRede;
@@ -1729,9 +1800,9 @@ void rodaShampoo() {
 
   unsigned long fim = millis() + volShampoo;
 
-  if (volShampoo > 0 && volume < 50) {
+  if (volShampoo > 0) {
     page4.show();
-    if (photoactive){
+    if (photoactive && volume < 50){
       digitalWrite (RELE8_PHOTOACTIVE, LOW);
     }
 
@@ -1856,7 +1927,7 @@ void rodaMapping() {
   page5.show();//retire seu produto
 
   //gravarSD(prepararDadosSdMapping(), "sham.txt"); TODO GRAVAR NO SD DADOS MAPPING
-  //enviarJson(criarMensagemJsonShampoo()); TODO ENVIAR JSON DADOS MAPPING
+  enviarJson(criarMensagemJsonMapping());
 
   String dadosWifi = prepararDadosWifiMapping();
     if (wifiSerial.createTCP(hostIp, port)) {
@@ -2007,13 +2078,15 @@ void setup() {
 
   if (conectado) {
     msgLoading.setText("Conectado");
+    picWifi.setPic(PIC_CONECTADO);
   } else {
     msgLoading.setText("Desconectado");
+    picWifi.setPic(PIC_DESCONECTADO);
   }
 
-  delay(1000);
+  delay(500);
 
-  if (wifiSerial.createTCP(hostIp, port)) {
+  if (conectado && wifiSerial.createTCP(hostIp, port)) {
     if(reenviarDadosTemporarios()){
       msgLoading.setText("Comandas enviadas com sucesso.");
       delay(1000);
