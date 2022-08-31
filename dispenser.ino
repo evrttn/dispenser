@@ -6,6 +6,7 @@
 #include <EEPROM.h>
 #include "ESP8266.h"
 #include <ArduinoJson.h>
+#include <TimeLib.h>
 
 ESP8266 wifiSerial(Serial1, 115200);
 
@@ -36,6 +37,12 @@ ESP8266 wifiSerial(Serial1, 115200);
 
 #define PIC_CONECTADO 18
 #define PIC_DESCONECTADO 19
+
+#define TENTATIVAS_CONEXAO 3
+#define TENTATIVAS_NTP 20
+
+#define SEVENZYYEARS 2208988800UL
+#define interrupcao 2
 
 // page0
 NexButton btnReles = NexButton(0, 3, "btnReles");
@@ -201,12 +208,20 @@ int K_valvula_11;
 RtcDS3231<TwoWire> Rtc(Wire);
 boolean isSdOk;
 
+unsigned long currentEpoc = 0;
+unsigned long timeOffset = -3;
+const int minutosOffset = 2;
+volatile bool modoStatus;
 //===================wifi===============
 bool conectado = false;
 String redeConectada = "";
+String senhaConectada = "";
 
 String hostIp = "";
 uint32_t port = 9007;
+
+int numComandasOffline;
+const int MAX_COMANDAS_OFFLINE = 20;
 //=======================================
 String profissional = "";
 String numeroComanda = "";
@@ -232,8 +247,6 @@ void btPhotoactiveTrPushCallback(void *ptr) {
 void btPhotoactiveShPushCallback(void *ptr) {
   photoactive = !photoactive;
 }
-
-
 //======================================RESETS==========================================
 void resetarPopupSenha() {
   txtComanda.setText("");
@@ -714,7 +727,101 @@ bool validarTratamento() {
   return true;
 }
 
-//=========================CARTAO SD E RTC=====================================
+//========================= RTC ==========================================
+void initRTC(){
+   Rtc.Begin();
+   if (!Rtc.GetIsRunning())
+   {
+       Serial.println("RTC was not actively running, starting now");
+       Rtc.SetIsRunning(true);
+   }
+   Rtc.Enable32kHzPin(false);
+   Rtc.SetSquareWavePin(DS3231SquareWavePin_ModeAlarmOne); //Habilta 1 alarme
+}
+
+void interrupcaoRtc(){
+  detachInterrupt(digitalPinToInterrupt(interrupcao));  
+  modoStatus=true;    
+}
+
+void setarAlarme(){
+  int minutos = Rtc.GetDateTime().Minute() + minutosOffset; 
+  if(minutos >= 60){
+    minutos = minutos % 60;
+  }
+    
+  DS3231AlarmOne alarm1(0, 0, minutos, 0, DS3231AlarmOneControl_MinutesSecondsMatch);
+  Rtc.SetAlarmOne(alarm1);
+  Rtc.LatchAlarmsTriggeredFlags();// Efetiva os alarmes
+  attachInterrupt(digitalPinToInterrupt(interrupcao), interrupcaoRtc, FALLING);
+  
+  Serial.print("alarme ");
+  Serial.print(Rtc.GetDateTime().Hour());
+  Serial.print(":");
+  Serial.println(minutos);  
+}
+
+bool sincronizarServidorNtp(){
+    bool registrou = false;
+    int tentativas  = 0;
+    while(!registrou && tentativas < TENTATIVAS_NTP){
+      Serial.println("registrando udp.");
+      registrou = wifiSerial.registerUDP("a.st1.ntp.br", 123);
+      tentativas++;
+    }
+    Serial.println("registrou udp.");
+    byte ntpData[48] = {0};
+    byte buffr[48] = {0};
+    //ntpData[0] = 0x1B;
+    ntpData[0] = 0b11100011;   // LI, Version, Mode
+    ntpData[1] = 0;     // Stratum, or type of clock
+    ntpData[2] = 6;     // Polling Interval
+    ntpData[3] = 0xEC;  // Peer Clock Precision
+    // 8 bytes of zero for Root Delay & Root Dispersion
+    ntpData[12]  = 49;
+    ntpData[13]  = 0x4E;
+    ntpData[14]  = 49;
+    ntpData[15]  = 52;
+
+    bool enviou = false;
+    uint32_t len = 0;
+    tentativas  = 0;
+    while((!enviou || len <= 0) && tentativas < TENTATIVAS_NTP){
+      Serial.println("enviando requisicao.");
+      enviou = wifiSerial.send(ntpData, 48);
+      len = wifiSerial.recv(buffr, sizeof(buffr), 3000);
+      tentativas++;
+    }
+    Serial.println("resposta recebida do servidor.");
+    if (len > 0) {
+      Serial.print("len: ");
+      Serial.print(len);
+      Serial.println(" bytes received. ");      
+    }else{
+      return false;
+    }
+    
+    if (wifiSerial.unregisterUDP()) {
+        Serial.print("unregister udp ok\r\n");
+    }
+
+    unsigned long highWord = word(buffr[40], buffr[41]);
+    unsigned long lowWord = word(buffr[42], buffr[43]);
+    // combine the four bytes (two words) into a long integer
+    // this is NTP time (seconds since Jan 1 1900):
+    unsigned long secsSince1900 = highWord << 16 | lowWord;
+
+    currentEpoc = secsSince1900 - SEVENZYYEARS + timeOffset*3600;
+    setTime(currentEpoc);    
+    return true;  
+}
+
+void ajustarRelogio(){
+    RtcDateTime compiled = RtcDateTime(year(), month(), day(), hour(), minute(), second(), false);
+    Rtc.SetDateTime(compiled);
+}
+
+//=========================CARTAO SD =====================================
 void gravarSD(String msg, String filename) {
   if (!isSdOk)
     return;
@@ -747,11 +854,6 @@ void lerSD(String filename) {
     Serial.print(F("error opening "));
     Serial.println(filename);
   }
-}
-
-void initRTC() {
-  //Aciona o relogio
-  Rtc.Begin();
 }
 
 void initSdCard() {
@@ -1073,7 +1175,24 @@ String criarMensagemJsonMapping() {
   return dados;
 }
 
-void enviarJson(String data)
+String criarMensagemJsonStatus(){
+  RtcDateTime agora = Rtc.GetDateTime();
+  
+  StaticJsonDocument<200> doc;
+  doc["codigo"] = codMaquina;
+  
+  char data[12];
+  char hora[10];
+  snprintf_P(data, sizeof(data), PSTR("%04u-%02u-%02u"), agora.Year(), agora.Month(), agora.Day());
+  snprintf_P(hora, sizeof(hora), PSTR("%02u:%02u:%02u"), agora.Hour(), agora.Minute(), agora.Second());
+  doc["data"] = String(data)+" "+String(hora);
+
+  String dados = "";  
+  serializeJson(doc, dados);  
+  return dados;
+}
+
+void enviarJson(String data, String uri)
 {
   uint8_t buffer[1024] = {0};
 
@@ -1088,7 +1207,6 @@ void enviarJson(String data)
   } 
 
   String server = HOST_NAME + ":" + HOST_PORT;
-  String uri = "/dispenserweb/api/comanda/adiciona/";
    
   String postRequest =
     "POST " + uri + " HTTP/1.0\r\n" +
@@ -1218,35 +1336,25 @@ void inicializarEeprom() {
 }
 
 //===============================WIFI=============================================
-void conectarWifi(String nomeRede, String senha) {
+bool isConectado(){
+  bool conectado = wifiSerial.ping("8.8.8.8");
+  return conectado;
+}
 
-  wifiSerial.restart();
-  conectado = false;
-
-  int tentativas = 3;
-  for (int i = 0; i < tentativas; i++) {
-    if (wifiSerial.setOprToStation()) {
-      Serial.print(F("to station ok\r\n"));
-      break;
-    } else {
-      Serial.print(F("to station err\r\n"));
-    }
-  }
-
-  for (int i = 0; i < tentativas; i++) {
-
+bool conectarWifi(String nomeRede, String senha) {
+  for (int i = 0; i < TENTATIVAS_CONEXAO; i++) {
     if (wifiSerial.joinAP(nomeRede, senha)) {
       conectado = true;
       Serial.print(F("Conectado na rede "));
-      Serial.print(nomeRede);
-      Serial.println();
+      Serial.println(nomeRede);
       Serial.print(F("IP: "));
       Serial.println(wifiSerial.getLocalIP().c_str());
-      break;
+      return true;
     } else {
       Serial.print(F("Join AP failure\r\n"));
     }
   }
+  return false;
 }
 
 void desconectarWifi() {
@@ -1271,10 +1379,10 @@ void iniciarWifi() {
         conectarWifi(nomeRede, senha);
         if (conectado){
           redeConectada = nomeRede;
+		  senhaConectada = senha;
           break;
         }
       }
-
       forigem.close();
     }
   }
@@ -1314,7 +1422,8 @@ void btnConectarPushCallback(void *ptr) {
   conectarWifi(n, s);
 
   if (conectado) {
-    redeConectada = nomeRede;
+    redeConectada = n;
+	senhaConectada = s;
     String msg = "Conectado na rede " + nomeRede;
     char buff2[1024];
     msg.toCharArray(buff2, sizeof(buff2));
@@ -1332,6 +1441,7 @@ void btnConectarPushCallback(void *ptr) {
     msg.toCharArray(buff3, sizeof(buff3));
     txtConexao.setText(buff3);
     redeConectada = "";
+	senhaConectada = "";
   }
   txtSenha.setText("");
 }
@@ -1451,8 +1561,8 @@ void btnWifiPopCallback(void *ptr) {
   lerIpComputadorRemoto();
 //
   txtConexao.setText("Verificando conexao...");
-  String ip = "8.8.8.8";
-  bool pingou = wifiSerial.ping(ip);
+
+  bool pingou = isConectado();
   if (pingou) {
     txtConexao.Set_font_color_pco(1024);
     txtConexao.setText("Conectado");
@@ -1815,7 +1925,7 @@ void rodaShampoo() {
 
     gravarSD(prepararDadosSdShampoo(), "sham.txt");
 
-    enviarJson(criarMensagemJsonShampoo());
+    enviarJson(criarMensagemJsonShampoo(), "/dispenserweb/api/comanda/adiciona/");
 
     String dadosWifi = prepararDadosWifiShampoo();
     if (wifiSerial.createTCP(hostIp, port)) {
@@ -1866,7 +1976,7 @@ void rodaTratamento() {
     page5.show();//retire seu produto
 
     gravarSD(prepararDadosSdTratamento(volumeBase, volumeCondicionador), "trat.txt");
-    enviarJson(criarMensagemJsonTratamento(n, volumeCondicionador));
+    enviarJson(criarMensagemJsonTratamento(n, volumeCondicionador), "/dispenserweb/api/comanda/adiciona/");
 
     String dadosWifi = prepararDadosWifiTratamento(n, volumeCondicionador);
     if (wifiSerial.createTCP(hostIp, port)) {
@@ -1927,7 +2037,7 @@ void rodaMapping() {
   page5.show();//retire seu produto
 
   //gravarSD(prepararDadosSdMapping(), "sham.txt"); TODO GRAVAR NO SD DADOS MAPPING
-  enviarJson(criarMensagemJsonMapping());
+  enviarJson(criarMensagemJsonMapping(), "/dispenserweb/api/comanda/adiciona/");
 
   String dadosWifi = prepararDadosWifiMapping();
     if (wifiSerial.createTCP(hostIp, port)) {
@@ -2055,6 +2165,7 @@ NexTouch *nex_listen_list[] = {
 
 void setup() {
   Serial.begin(9600);
+  pinMode(interrupcao, INPUT_PULLUP);
 
   nexInit();
   page3.show();
@@ -2068,8 +2179,9 @@ void setup() {
   lerConfiguracaoValvulas();
   initSdCard();
   initRTC();
+  modoStatus = true;
   desconectarWifi(); //modulo conecta na ultima rede assim que ligado
-  lerIpComputadorRemoto();
+  //lerIpComputadorRemoto();
 
   lerDadosBasicos();
 
@@ -2159,12 +2271,25 @@ void setup() {
   btnCadastro.attachPush(btnCadastroPushCallback, &btnCadastro);
   btnGerenciar.attachPop(btnGerenciarPopCallback);
   btnInativar.attachPush(btnInativarPushCallback, &btnInativar);
-  
-  
+    
   page0.show();
 }
 
 void loop() {
   nexLoop(nex_listen_list);
   delay(150);
+  
+  if(modoStatus){
+    conectado = isConectado();
+    if(!conectado){
+      conectado = conectarWifi(redeConectada, senhaConectada);
+      if(conectado && sincronizarServidorNtp())
+        ajustarRelogio();
+    }
+    picWifi.setPic(conectado?0:1);
+    if(conectado)
+      enviarJson(criarMensagemJsonStatus(), "/dispenserweb/api/maquina/sit/");
+    setarAlarme();
+    modoStatus=false;    
+  }
 }
