@@ -52,6 +52,7 @@ NexButton btnWifi = NexButton(0, 5, "btWifi");
 NexButton btnCadastro = NexButton(0, 4, "btnCadastro");
 NexButton btnMapping = NexButton(0, 6, "bt2");
 NexPicture picWifi = NexPicture(0, 7, "p0");
+NexText txtPage0 = NexText(0, 8, "t0");
 
 // page1
 NexDSButton btRegenerant = NexDSButton(1, 5, "bt1");
@@ -636,9 +637,10 @@ bool procurarSenha(String password, String filename) {
       String nomeSenha = arquivo.readStringUntil('\n');
       int idxSeparador = nomeSenha.lastIndexOf(";");
       int iniSeparador = nomeSenha.indexOf(";");
+      int idSeparador = nomeSenha.indexOf("#"); 
       
       String senha = nomeSenha.substring(iniSeparador+1, idxSeparador);
-      profissional = nomeSenha.substring(0, iniSeparador);
+      profissional = nomeSenha.substring(idSeparador, iniSeparador);
       char s = nomeSenha.charAt(idxSeparador+1);
  
       if (password.equals(senha) && s == 'A') {
@@ -665,6 +667,19 @@ void cadastrarProfissional(String str) {
   cProfissional.getValue(&iProfissional);
   cGerente.getValue(&iGerente);
   cTecnico.getValue(&iTecnico);
+
+  int linhas[3] = {0}; 
+  linhas[0] = contarLinhas(BDPROFISSIONAIS); 
+  linhas[1] = contarLinhas(BDGERENTES); 
+  linhas[2] = contarLinhas(BDTECNICOS); 
+   
+  int id = -1; 
+  for(int i = 0; i < 3; i++){ 
+	  if(linhas[i] > id) 
+		  id = linhas[i]; 
+  } 
+   
+  str = String(id) + "#" + str; 
 
   if (iProfissional == 1)
     gravarSD(str, BDPROFISSIONAIS);
@@ -1344,7 +1359,6 @@ bool isConectado(){
 bool conectarWifi(String nomeRede, String senha) {
   for (int i = 0; i < TENTATIVAS_CONEXAO; i++) {
     if (wifiSerial.joinAP(nomeRede, senha)) {
-      conectado = true;
       Serial.print(F("Conectado na rede "));
       Serial.println(nomeRede);
       Serial.print(F("IP: "));
@@ -1376,7 +1390,7 @@ void iniciarWifi() {
         nomeRede = forigem.readStringUntil('\n');
         senha = forigem.readStringUntil('\n');
         
-        conectarWifi(nomeRede, senha);
+        conectado = conectarWifi(nomeRede, senha);
         if (conectado){
           redeConectada = nomeRede;
 		  senhaConectada = senha;
@@ -1387,6 +1401,22 @@ void iniciarWifi() {
     }
   }
 }
+
+int contarLinhas(String arquivo) { 
+  int qtd = -1; 
+  if (SD.exists(arquivo)) { 
+    File forigem = SD.open(arquivo); 
+    if (forigem) { 
+	  qtd = 0; 
+      while (forigem.available()) { 
+        String linha = forigem.readStringUntil('\n'); 
+        qtd++; 
+      } 
+      forigem.close(); 
+    } 
+  } 
+  return qtd; 
+} 
 
 bool reenviarDadosTemporarios() {
   bool enviou = false;
@@ -1419,7 +1449,7 @@ void btnConectarPushCallback(void *ptr) {
   txtConexao.setText("Conectando...");
   String n = nomeRede.substring(0, nomeRede.indexOf("\r")); //nextion coloca \r no final da string
   String s = senha.substring(0, senha.indexOf("\r"));
-  conectarWifi(n, s);
+  conectado = conectarWifi(n, s);
 
   if (conectado) {
     redeConectada = n;
@@ -2073,6 +2103,24 @@ void btnIniciarPopCallback(void *ptr) {
     return;
   }
 
+  if(!(numComandasOffline < MAX_COMANDAS_OFFLINE)){ 
+    String msg = "Limite de " + String(MAX_COMANDAS_OFFLINE) +" comandas atingido. Contate o tecnico."; 
+    txtMsg.setText(msg.c_str()); 
+	txtPage0.setText(msg.c_str());     
+    return; 
+  } 
+   
+  conectado = isConectado(); 
+  if(!conectado){ 
+    numComandasOffline++; 
+    String msg = String(numComandasOffline) +" comandas sem internet. Limite: "+ String(MAX_COMANDAS_OFFLINE); 
+	txtPage0.setText(msg.c_str()); 
+  }else{ 
+    numComandasOffline = 0; 
+	txtPage0.setText(""); 
+	txtMsg.setText(""); 
+  }  
+
   if (procurarSenha(strSenha, BDPROFISSIONAIS)) {
     resetarPopupSenha();
     if (opcao == SHAMPOO) {
@@ -2088,6 +2136,10 @@ void btnIniciarPopCallback(void *ptr) {
 }
 
 //=============================================================================================
+void iniciarVariaveisGlobais(){ 
+  numComandasOffline = contarLinhas("tmp.txt");	 
+} 
+
 void definirSaidas() {
   pinMode (RELE1_REGENERANT, OUTPUT);
   pinMode (RELE2_NUTRITION, OUTPUT);
@@ -2104,6 +2156,10 @@ void definirSaidas() {
   pinMode (RELE10_CURLY, OUTPUT);
   pinMode (RELE9_BASE, OUTPUT);
 }
+
+void definirEntradas() { 
+   pinMode(interrupcao, INPUT_PULLUP); 
+} 
 
 NexTouch *nex_listen_list[] = {
   &btRegenerant,
@@ -2165,11 +2221,11 @@ NexTouch *nex_listen_list[] = {
 
 void setup() {
   Serial.begin(9600);
-  pinMode(interrupcao, INPUT_PULLUP);
 
   nexInit();
   page3.show();
 
+  definirEntradas();   
   definirSaidas();
   resetarReles();
   resetarRelesTratamento();
@@ -2207,6 +2263,8 @@ void setup() {
   }
 
   msgLoading.setText("");
+
+  iniciarVariaveisGlobais(); 
 
   btnReles.attachPush(btnRelesPushCallback, &btnReles);
   btnCadastrar.attachPop(btnCadastrarPopCallback);
