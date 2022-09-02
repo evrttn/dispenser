@@ -1718,8 +1718,9 @@ void btnInativarPushCallback(void *ptr, int pos) {
       dados = arquivo.readStringUntil('\n');
       int idxSeparador = dados.indexOf(";");
       int lastSeparador = dados.lastIndexOf(";");
+      int idSeparador = dados.indexOf("#");
              
-      String nome = dados.substring(0, idxSeparador);
+      String nome = dados.substring(idSeparador, idxSeparador);
       if(usuario.equals(nome)){
         char s = dados.charAt(lastSeparador+1);
         if(s == 'A')
@@ -1867,8 +1868,9 @@ void lerCadastro(String filename, String perfil) {
       String nomeSenhaStatus = arquivo.readStringUntil('\n');
     int iniSeparador = nomeSenhaStatus.indexOf(";");
       int fimSeparador = nomeSenhaStatus.lastIndexOf(";");
+      int idSeparador = nomeSenhaStatus.indexOf("#");
       String senha = nomeSenhaStatus.substring(iniSeparador + 1, fimSeparador);
-      String profissional = nomeSenhaStatus.substring(0, iniSeparador);
+      String profissional = nomeSenhaStatus.substring(idSeparador, iniSeparador);
     String s = nomeSenhaStatus.substring(fimSeparador + 1, fimSeparador + 2).equals("A")?"Ativo":"Inativo";
 
       profissional = profissional + "^" + perfil + "^"+s;
