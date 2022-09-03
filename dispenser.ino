@@ -140,9 +140,6 @@ NexText txtSenha = NexText(9, 4, "txtSenha");
 NexText txtConexao = NexText(9, 7, "txtConexao");
 NexButton btnConectar = NexButton(9, 6, "btnConectar");
 
-NexText txtIP = NexText(9, 8, "txtIP");
-NexButton btnGravar = NexButton(9, 9, "btnGravar");
-
 //page9 popup p/ liberar produtos
 NexText txtComanda = NexText(11, 3, "txtComanda");
 NexText txtPassword = NexText(11, 4, "txtSenha");
@@ -226,7 +223,6 @@ const int MAX_COMANDAS_OFFLINE = 20;
 //=======================================
 String profissional = "";
 String numeroComanda = "";
-
 //=======================BDs====================
 const String BDPROFISSIONAIS = "PRO.TXT";
 const String BDGERENTES = "GER.TXT";
@@ -236,6 +232,7 @@ const String BDMASTER = "MTR.TXT";
 //=======================CODIGOS===============
 String codMaquina = "";
 String codSalao = "";
+String codUsuario = "";
 //=======================VOLUMES===============
 unsigned long volume = 0;
 unsigned long volumeTotal = 0;
@@ -641,6 +638,7 @@ bool procurarSenha(String password, String filename) {
       
       String senha = nomeSenha.substring(iniSeparador+1, idxSeparador);
       profissional = nomeSenha.substring(idSeparador, iniSeparador);
+	    codUsuario = nomeSenha.substring(0, idSeparador);
       char s = nomeSenha.charAt(idxSeparador+1);
  
       if (password.equals(senha) && s == 'A') {
@@ -983,40 +981,6 @@ String prepararDadosSdTratamento(unsigned long volumeBase, unsigned long volumeC
   return msg;
 }
 
-
-void lerIpComputadorRemoto() {
-  if (!isSdOk)
-    return;
-
-  File myFile = SD.open("ip.txt");
-  if (myFile) {
-    String ip = myFile.readStringUntil('\n');
-    hostIp = ip;
-    char buff[17];
-    ip.toCharArray(buff, 17);
-    txtIP.setText(buff);
-    myFile.close();
-  } else {
-    Serial.print(F("error opening "));
-    Serial.println(F("ip.txt"));
-  }
-}
-
-void btnGravarPopCallback(void *ptr) {
-  char buff[17] = {0};
-  txtIP.getText(buff, sizeof(buff));
-  String ip(buff);
-  hostIp = ip;
-
-  if (SD.exists("ip.txt")) {
-    SD.remove("ip.txt");
-  }
-
-  gravarSD(hostIp, "ip.txt");
-
-  txtConexao.setText("IP gravado");
-}
-
 void lerDadosBasicos(){
    if (!isSdOk)
     return;
@@ -1061,12 +1025,59 @@ bool procurarRede(String rede, String senha, String filename) {
   }
   return encontrou;
 }
+
+String prepararDadosSdMapping() {
+  String msg = "Mapping ";
+
+  RtcDateTime now = Rtc.GetDateTime();
+  char data[12];
+  char hora[10];
+
+  snprintf_P(data, countof(data), PSTR("%02u/%02u/%04u"), now.Day(), now.Month(), now.Year());
+  snprintf_P(hora, countof(hora), PSTR("%02u:%02u"), now.Hour(), now.Minute());
+
+   switch (opcaoMapping) {
+    case CURTO:
+      volume = 15;      
+      break;
+    case MEDIO:
+      volume = 24;
+      break;
+    case LONGO:
+      volume = 33;
+      break;
+    case NENHUM:
+      break;
+  }
+  
+  msg += ";";
+  msg += "volume:";
+  msg += volume;
+  msg += ";";
+  msg += "photo.:";
+  msg += false;
+  msg += ";";
+  msg += "hora:";
+  msg += hora;
+  msg += ";";
+  msg += "data:";
+  msg += data;
+  msg += ";";
+  msg += "profissional:";
+  msg += profissional;
+  msg += ";";
+  msg += "comanda:";
+  msg += numeroComanda;
+  msg += "\n";
+
+  return msg;
+}
 //==========================================JSON===========================================================
 String criarMensagemJsonShampoo() {
   StaticJsonDocument<200> doc;
   doc["codMaquina"] = codMaquina;
   doc["codSalao"] = codSalao;
-  doc["codUsuario"] = 1; //TODO
+  doc["codUsuario"] = codUsuario;
   doc["nomeUsuario"] = profissional;
   doc["numero"] = numeroComanda;
   doc["photoactive"] = photoactive;
@@ -1115,7 +1126,7 @@ String criarMensagemJsonTratamento(unsigned long n, unsigned long volumeCondicio
   StaticJsonDocument<200> doc;
   doc["codMaquina"] = codMaquina;
   doc["codSalao"] = codSalao;
-  doc["codUsuario"] = 1; //TODO
+  doc["codUsuario"] = codUsuario;
   doc["nomeUsuario"] = profissional;
   doc["numero"] = numeroComanda;
   doc["photoactive"] = photoactive;
@@ -1150,7 +1161,7 @@ String criarMensagemJsonMapping() {
   StaticJsonDocument<200> doc;
   doc["codMaquina"] = codMaquina;
   doc["codSalao"] = codSalao;
-  doc["codUsuario"] = 1; //TODO
+  doc["codUsuario"] = codUsuario;
   doc["nomeUsuario"] = profissional;
   doc["numero"] = numeroComanda;
   doc["photoactive"] = photoactive;
@@ -1207,7 +1218,7 @@ String criarMensagemJsonStatus(){
   return dados;
 }
 
-void enviarJson(String data, String uri)
+bool enviarJson(String data, String uri)
 {
   uint8_t buffer[1024] = {0};
 
@@ -1218,7 +1229,7 @@ void enviarJson(String data, String uri)
     Serial.print("create tcp ok\r\n");
   } else {
     Serial.print("create tcp err\r\n");
-    return;
+    return false;
   } 
 
   String server = HOST_NAME + ":" + HOST_PORT;
@@ -1241,6 +1252,7 @@ void enviarJson(String data, String uri)
     }
     Serial.print("]\r\n");
   }
+  return true;
 }
 //=======================CONFIGURACAO DAS VALVULAS=======================
 void lerConfiguracaoValvulas() {
@@ -1427,7 +1439,7 @@ bool reenviarDadosTemporarios() {
       enviou = true;
       while (forigem.available()) {
         String linha = forigem.readStringUntil('\n');
-        enviarDadosWifi(linha);
+        enviarJson(linha,"/dispenserweb/api/comanda/adiciona/");
       }
       forigem.close();
       SD.remove(arquivo);
@@ -1580,15 +1592,14 @@ String prepararDadosWifiMapping() {
 
 void btnWifiPopCallback(void *ptr) {
   page9.show();
-  txtIP.setText("");
   txtSenha.setText("");
   comboRede.setText("");
   
   txtConexao.setText("Procurando redes wifi...");
   buscarRedesDisponiveis();
 
-  txtConexao.setText("Lendo IP remoto...");
-  lerIpComputadorRemoto();
+  //txtConexao.setText("Lendo IP remoto...");
+  //lerIpComputadorRemoto();
 //
   txtConexao.setText("Verificando conexao...");
 
@@ -1957,14 +1968,12 @@ void rodaShampoo() {
 
     gravarSD(prepararDadosSdShampoo(), "sham.txt");
 
-    enviarJson(criarMensagemJsonShampoo(), "/dispenserweb/api/comanda/adiciona/");
+	String dadosWifi = criarMensagemJsonShampoo();
+    bool enviou = enviarJson(dadosWifi, "/dispenserweb/api/comanda/adiciona/");
 
-    String dadosWifi = prepararDadosWifiShampoo();
-    if (wifiSerial.createTCP(hostIp, port)) {
+    if (enviou) {
       reenviarDadosTemporarios();
       delay(500);
-      enviarDadosWifi(dadosWifi);
-      wifiSerial.releaseTCP();
     } else {
       dadosWifi += "\n";
       gravarSD(dadosWifi, "tmp.txt");
@@ -2008,14 +2017,12 @@ void rodaTratamento() {
     page5.show();//retire seu produto
 
     gravarSD(prepararDadosSdTratamento(volumeBase, volumeCondicionador), "trat.txt");
-    enviarJson(criarMensagemJsonTratamento(n, volumeCondicionador), "/dispenserweb/api/comanda/adiciona/");
-
-    String dadosWifi = prepararDadosWifiTratamento(n, volumeCondicionador);
-    if (wifiSerial.createTCP(hostIp, port)) {
+	String dadosWifi = criarMensagemJsonTratamento(n, volumeCondicionador);
+    bool enviou = enviarJson(dadosWifi, "/dispenserweb/api/comanda/adiciona/");
+    
+    if (enviou) {
       reenviarDadosTemporarios();
       delay(500);
-      enviarDadosWifi(dadosWifi);
-      wifiSerial.releaseTCP();
     } else {
       dadosWifi += "\n";
       gravarSD(dadosWifi, "tmp.txt");
@@ -2068,15 +2075,13 @@ void rodaMapping() {
   digitalWrite (RELE8_PHOTOACTIVE, HIGH);
   page5.show();//retire seu produto
 
-  //gravarSD(prepararDadosSdMapping(), "sham.txt"); TODO GRAVAR NO SD DADOS MAPPING
-  enviarJson(criarMensagemJsonMapping(), "/dispenserweb/api/comanda/adiciona/");
-
-  String dadosWifi = prepararDadosWifiMapping();
-    if (wifiSerial.createTCP(hostIp, port)) {
+  gravarSD(prepararDadosSdMapping(), "mapp.txt");
+   String dadosWifi = criarMensagemJsonMapping();
+   bool enviou = enviarJson(dadosWifi, "/dispenserweb/api/comanda/adiciona/");
+  
+    if (enviou) {
       reenviarDadosTemporarios();
       delay(500);
-      enviarDadosWifi(dadosWifi);
-      wifiSerial.releaseTCP();
     } else {
       dadosWifi += "\n";
       gravarSD(dadosWifi, "tmp.txt");
@@ -2106,7 +2111,7 @@ void btnIniciarPopCallback(void *ptr) {
   }
 
   if(!(numComandasOffline < MAX_COMANDAS_OFFLINE)){ 
-    String msg = "Limite de " + String(MAX_COMANDAS_OFFLINE) +" comandas atingido. Contate o tecnico."; 
+    String msg = "Máx. de " + String(MAX_COMANDAS_OFFLINE) +" comandas sem internet atingido."; 
     txtMsg.setText(msg.c_str()); 
 	txtPage0.setText(msg.c_str());     
     return; 
@@ -2193,7 +2198,6 @@ NexTouch *nex_listen_list[] = {
   &btnTreatment,
   &btnFechar,
   &btnWifi,
-  &btnGravar,
   &btnRele1At,
   &btnRele2At,
   &btnRele3At,
@@ -2313,7 +2317,6 @@ void setup() {
   btnFechar.attachPop(btnFecharPopCallback);
   btnFecharGerenciar.attachPop(btnFecharGerenciarPopCallback);
   btnWifi.attachPop(btnWifiPopCallback);
-  btnGravar.attachPop(btnGravarPopCallback);
   btnProximo.attachPop(btnProximoPopCallback);
   btnRele1At.attachPop(btnRele1AtPopCallback);
   btnRele2At.attachPop(btnRele2AtPopCallback);
