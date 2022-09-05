@@ -208,15 +208,12 @@ boolean isSdOk;
 
 unsigned long currentEpoc = 0;
 unsigned long timeOffset = -3;
-const int minutosOffset = 2;
+const int minutosOffset = 3;
 volatile bool modoStatus;
 //===================wifi===============
 bool conectado = false;
 String redeConectada = "";
 String senhaConectada = "";
-
-String hostIp = "";
-uint32_t port = 9007;
 
 int numComandasOffline;
 const int MAX_COMANDAS_OFFLINE = 20;
@@ -529,6 +526,8 @@ void btnProximoPopCallback(void *ptr) {
       txtMsgGerenciar.setText("Senha nao encontrada");
     }
   } else if (opcao == CADASTRO) {
+    txtTecnico.setOpaqueness(0);
+    cTecnico.setOpaqueness(0);
     if (procurarSenha(strSenha, BDMASTER)) {
       txtTecnico.setOpaqueness(127);
       cTecnico.setOpaqueness(127);
@@ -552,7 +551,7 @@ void btnRelesPushCallback(void *ptr) {
 
 void btnAtualizarPushCallback(void *ptr) {
   salvarConfiguracaoValvulas();
-  page0.show();
+  gotoPage0();
 }
 
 //==========================================CADASTRAR USUARIO=====================================
@@ -637,7 +636,7 @@ bool procurarSenha(String password, String filename) {
       int idSeparador = nomeSenha.indexOf("#"); 
       
       String senha = nomeSenha.substring(iniSeparador+1, idxSeparador);
-      profissional = nomeSenha.substring(idSeparador, iniSeparador);
+      profissional = nomeSenha.substring(idSeparador+1, iniSeparador);
 	    codUsuario = nomeSenha.substring(0, idSeparador);
       char s = nomeSenha.charAt(idxSeparador+1);
  
@@ -750,6 +749,29 @@ void initRTC(){
    }
    Rtc.Enable32kHzPin(false);
    Rtc.SetSquareWavePin(DS3231SquareWavePin_ModeAlarmOne); //Habilta 1 alarme
+
+/*
+  TODO
+  if(conectado){
+    msgLoading.setText("Conectado. Sincronizando relogio...");
+    if(sincronizarServidorNtp()){
+      ajustarRelogio();
+
+      RtcDateTime now = Rtc.GetDateTime();
+      char data[11];
+      char hora[7];
+      snprintf_P(data, sizeof(data), PSTR("%02u/%02u/%04u"), now.Day(), now.Month(), now.Year());
+      snprintf_P(hora, sizeof(hora), PSTR("%02u:%02u"), now.Hour(), now.Minute());
+    
+      String msgRelogio = "Relogio: " + String(data) + " " + String(hora);
+      msgLoading.setText(msgRelogio.c_str());
+    }else{
+      msgLoading.setText("Nao sincronizou com servidor NTP.");
+    }
+  }
+  
+  
+  */
 }
 
 void interrupcaoRtc(){
@@ -779,7 +801,7 @@ bool sincronizarServidorNtp(){
     int tentativas  = 0;
     while(!registrou && tentativas < TENTATIVAS_NTP){
       Serial.println("registrando udp.");
-      registrou = wifiSerial.registerUDP("a.st1.ntp.br", 123);
+      registrou = wifiSerial.registerUDP("200.160.7.186", 123); //a.st1.ntp.br
       tentativas++;
     }
     Serial.println("registrou udp.");
@@ -1220,10 +1242,10 @@ String criarMensagemJsonStatus(){
 
 bool enviarJson(String data, String uri)
 {
-  uint8_t buffer[1024] = {0};
+  uint8_t buffr[1024] = {0};
 
-  String HOST_NAME = "galusa.ddns.com.br";
-  int HOST_PORT = 9090;
+  String HOST_NAME = "teste.k08.com.br";
+  int HOST_PORT = 80;
 
   if (wifiSerial.createTCP(HOST_NAME, HOST_PORT)) {
     Serial.print("create tcp ok\r\n");
@@ -1242,13 +1264,16 @@ bool enviarJson(String data, String uri)
     "Content-Type: application/json\r\n" +
     "\r\n" + data;
 
+  Serial.println(data);
   wifiSerial.send(postRequest.c_str(), postRequest.length());
 
-  uint32_t len = wifiSerial.recv(buffer, sizeof(buffer), 10000);
+  uint32_t len = wifiSerial.recv(buffr, sizeof(buffr), 10000);
+  Serial.print("size recebido do server json ");
+  Serial.println(len);
   if (len > 0) {
     Serial.print("Received:[");
     for (uint32_t i = 0; i < len; i++) {
-      Serial.print((char)buffer[i]);
+      Serial.print((char)buffr[i]);
     }
     Serial.print("]\r\n");
   }
@@ -1368,8 +1393,12 @@ bool isConectado(){
   return conectado;
 }
 
-bool conectarWifi(String nomeRede, String senha) {
-  for (int i = 0; i < TENTATIVAS_CONEXAO; i++) {
+bool conectarWifi(String nomeRede, String senha, int tentativas) {
+   for (int i = 0; i < tentativas; i++) {
+    Serial.print(F("Conectando na rede "));
+    Serial.print(nomeRede);
+    Serial.print(F(" com a senha "));
+    Serial.println(senha);
     if (wifiSerial.joinAP(nomeRede, senha)) {
       Serial.print(F("Conectado na rede "));
       Serial.println(nomeRede);
@@ -1392,26 +1421,55 @@ void enviarDadosWifi(String msg) {
 }
 
 void iniciarWifi() {
+  msgLoading.setText("Conectando...");
+  
   String arquivo = "wifi.txt";
   String nomeRede = "";
   String senha = "";
+  String msg = "";
+  
+  picWifi.setPic(PIC_DESCONECTADO);
+
+  wifiSerial.restart();
+  conectado = false;
+
+  for (int i = 0; i < TENTATIVAS_CONEXAO; i++) {
+    if (wifiSerial.setOprToStation()) {
+      Serial.print(F("to station ok\r\n"));
+      break;
+    } else {
+      Serial.print(F("to station err\r\n"));
+    }
+  }
+  
   if (SD.exists(arquivo)) {
     File forigem = SD.open(arquivo);
     if (forigem) {
       while (forigem.available()) {
         nomeRede = forigem.readStringUntil('\n');
         senha = forigem.readStringUntil('\n');
-        
-        conectado = conectarWifi(nomeRede, senha);
+        msg = "Conectando na rede "+nomeRede+"...";
+        msgLoading.setText(msg.c_str());
+        conectado = conectarWifi(nomeRede, senha, TENTATIVAS_CONEXAO);
         if (conectado){
           redeConectada = nomeRede;
-		  senhaConectada = senha;
+		      senhaConectada = senha;    
           break;
         }
       }
-      forigem.close();
+      forigem.close();    
     }
   }
+
+  if (conectado) {
+    msgLoading.setText("Conectado");
+    picWifi.setPic(PIC_CONECTADO);
+  } else {
+    msgLoading.setText("Desconectado");
+    picWifi.setPic(PIC_DESCONECTADO);
+  }
+
+  delay(1000);
 }
 
 int contarLinhas(String arquivo) { 
@@ -1439,7 +1497,7 @@ bool reenviarDadosTemporarios() {
       enviou = true;
       while (forigem.available()) {
         String linha = forigem.readStringUntil('\n');
-        enviarJson(linha,"/dispenserweb/api/comanda/adiciona/");
+        enviarJson(linha,"/api/comanda/adiciona/");
       }
       forigem.close();
       SD.remove(arquivo);
@@ -1449,6 +1507,7 @@ bool reenviarDadosTemporarios() {
 }
 
 void btnConectarPushCallback(void *ptr) {
+  desconectarWifi(); //desconecta da ultima rede conectado
  
   char buff1[31] = {0};
   comboRede.getText(buff1, sizeof(buff1));
@@ -1458,21 +1517,24 @@ void btnConectarPushCallback(void *ptr) {
   txtSenha.getText(buffSenha, sizeof(buffSenha));
   String senha(buffSenha);
 
+  //TODO validacao nome e senha
+
   txtConexao.setText("Conectando...");
   String n = nomeRede.substring(0, nomeRede.indexOf("\r")); //nextion coloca \r no final da string
   String s = senha.substring(0, senha.indexOf("\r"));
-  conectado = conectarWifi(n, s);
-
+  conectado = conectarWifi(n, s, TENTATIVAS_CONEXAO);
+  picWifi.setPic(conectado?PIC_CONECTADO:PIC_DESCONECTADO);
+  
   if (conectado) {
     redeConectada = n;
-	senhaConectada = s;
+	  senhaConectada = s;
     String msg = "Conectado na rede " + nomeRede;
     char buff2[1024];
     msg.toCharArray(buff2, sizeof(buff2));
     txtConexao.Set_font_color_pco(1024);
     txtConexao.setText(buff2);
 
-    if(procurarRede(n, s, "wifi.txt")){
+    if(!procurarRede(n, s, "wifi.txt")){
       String nomeSenha = n + "\n" + s + "\n";
       gravarSD(nomeSenha, "wifi.txt");
     }
@@ -1483,8 +1545,9 @@ void btnConectarPushCallback(void *ptr) {
     msg.toCharArray(buff3, sizeof(buff3));
     txtConexao.setText(buff3);
     redeConectada = "";
-	senhaConectada = "";
+	  senhaConectada = "";
   }
+  
   txtSenha.setText("");
 }
 
@@ -1674,7 +1737,7 @@ void btnMappingPushCallback(void *ptr) {
 
 void btnFecharGerenciarPopCallback(void *ptr) {
   resetarPopupSenha();
-  page0.show();
+  gotoPage0();
 }
 
 void btnCadastroPushCallback(void *ptr) {
@@ -1731,7 +1794,7 @@ void btnInativarPushCallback(void *ptr, int pos) {
       int lastSeparador = dados.lastIndexOf(";");
       int idSeparador = dados.indexOf("#");
              
-      String nome = dados.substring(idSeparador, idxSeparador);
+      String nome = dados.substring(idSeparador+1, idxSeparador);
       if(usuario.equals(nome)){
         char s = dados.charAt(lastSeparador+1);
         if(s == 'A')
@@ -1881,7 +1944,7 @@ void lerCadastro(String filename, String perfil) {
       int fimSeparador = nomeSenhaStatus.lastIndexOf(";");
       int idSeparador = nomeSenhaStatus.indexOf("#");
       String senha = nomeSenhaStatus.substring(iniSeparador + 1, fimSeparador);
-      String profissional = nomeSenhaStatus.substring(idSeparador, iniSeparador);
+      String profissional = nomeSenhaStatus.substring(idSeparador+1, iniSeparador);
     String s = nomeSenhaStatus.substring(fimSeparador + 1, fimSeparador + 2).equals("A")?"Ativo":"Inativo";
 
       profissional = profissional + "^" + perfil + "^"+s;
@@ -1969,7 +2032,7 @@ void rodaShampoo() {
     gravarSD(prepararDadosSdShampoo(), "sham.txt");
 
 	String dadosWifi = criarMensagemJsonShampoo();
-    bool enviou = enviarJson(dadosWifi, "/dispenserweb/api/comanda/adiciona/");
+    bool enviou = enviarJson(dadosWifi, "/api/comanda/adiciona/");
 
     if (enviou) {
       reenviarDadosTemporarios();
@@ -1979,7 +2042,7 @@ void rodaShampoo() {
       gravarSD(dadosWifi, "tmp.txt");
     }
   }
-  page0.show();
+  gotoPage0();
 }
 
 void rodaTratamento() {
@@ -2018,7 +2081,7 @@ void rodaTratamento() {
 
     gravarSD(prepararDadosSdTratamento(volumeBase, volumeCondicionador), "trat.txt");
 	String dadosWifi = criarMensagemJsonTratamento(n, volumeCondicionador);
-    bool enviou = enviarJson(dadosWifi, "/dispenserweb/api/comanda/adiciona/");
+    bool enviou = enviarJson(dadosWifi, "/api/comanda/adiciona/");
     
     if (enviou) {
       reenviarDadosTemporarios();
@@ -2028,7 +2091,7 @@ void rodaTratamento() {
       gravarSD(dadosWifi, "tmp.txt");
     }
   }
-  page0.show();
+  gotoPage0();
 }
 
 void rodaMapping() {
@@ -2077,7 +2140,7 @@ void rodaMapping() {
 
   gravarSD(prepararDadosSdMapping(), "mapp.txt");
    String dadosWifi = criarMensagemJsonMapping();
-   bool enviou = enviarJson(dadosWifi, "/dispenserweb/api/comanda/adiciona/");
+   bool enviou = enviarJson(dadosWifi, "/api/comanda/adiciona/");
   
     if (enviou) {
       reenviarDadosTemporarios();
@@ -2087,7 +2150,7 @@ void rodaMapping() {
       gravarSD(dadosWifi, "tmp.txt");
     }
   
-  page0.show();
+  gotoPage0();
 }
 
 void btnIniciarPopCallback(void *ptr) {
@@ -2166,7 +2229,12 @@ void definirSaidas() {
 
 void definirEntradas() { 
    pinMode(interrupcao, INPUT_PULLUP); 
-} 
+}
+
+void gotoPage0(){
+  page0.show();
+  picWifi.setPic(conectado?PIC_CONECTADO:PIC_DESCONECTADO);
+}
 
 NexTouch *nex_listen_list[] = {
   &btRegenerant,
@@ -2240,32 +2308,21 @@ void setup() {
   //inicializarEeprom();
   lerConfiguracaoValvulas();
   initSdCard();
-  initRTC();
   modoStatus = true;
   desconectarWifi(); //modulo conecta na ultima rede assim que ligado
   //lerIpComputadorRemoto();
 
   lerDadosBasicos();
-
-  msgLoading.setText("Conectando...");
+  
   iniciarWifi();
+  
+  initRTC();  
 
   if (conectado) {
-    msgLoading.setText("Conectado");
-    picWifi.setPic(PIC_CONECTADO);
-  } else {
-    msgLoading.setText("Desconectado");
-    picWifi.setPic(PIC_DESCONECTADO);
-  }
-
-  delay(500);
-
-  if (conectado && wifiSerial.createTCP(hostIp, port)) {
     if(reenviarDadosTemporarios()){
       msgLoading.setText("Comandas enviadas com sucesso.");
       delay(1000);
-    }
-    wifiSerial.releaseTCP();    
+    }   
   }
 
   msgLoading.setText("");
@@ -2335,7 +2392,7 @@ void setup() {
   btnGerenciar.attachPop(btnGerenciarPopCallback);
   btnInativar.attachPush(btnInativarPushCallback, &btnInativar);
     
-  page0.show();
+  gotoPage0();
 }
 
 void loop() {
@@ -2344,14 +2401,15 @@ void loop() {
   
   if(modoStatus){
     conectado = isConectado();
-    if(!conectado){
-      conectado = conectarWifi(redeConectada, senhaConectada);
-      if(conectado && sincronizarServidorNtp())
-        ajustarRelogio();
-    }
-    picWifi.setPic(conectado?0:1);
+    //if(!conectado){
+      //wifiSerial.restart();
+      //conectado = conectarWifi(redeConectada, senhaConectada, 2);
+//      if(conectado && sincronizarServidorNtp())
+//        ajustarRelogio();
+    //}
+    //picWifi.setPic(conectado?PIC_CONECTADO:PIC_DESCONECTADO); imagem de conexao aparecia em outras telas
     if(conectado)
-      enviarJson(criarMensagemJsonStatus(), "/dispenserweb/api/maquina/sit/");
+      enviarJson(criarMensagemJsonStatus(), "/api/maquina/sit/");
     setarAlarme();
     modoStatus=false;    
   }
