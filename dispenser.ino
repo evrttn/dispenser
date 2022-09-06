@@ -6,8 +6,10 @@
 #include <EEPROM.h>
 #include "ESP8266.h"
 #include <ArduinoJson.h>
-#include <TimeLib.h>
+//#include <TimeLib.h>
+#include <UnixTime.h>
 
+UnixTime stamp(-3);
 ESP8266 wifiSerial(Serial1, 115200);
 
 #define SS 53
@@ -39,9 +41,8 @@ ESP8266 wifiSerial(Serial1, 115200);
 #define PIC_DESCONECTADO 19
 
 #define TENTATIVAS_CONEXAO 3
-#define TENTATIVAS_NTP 20
+#define TENTATIVAS_NTP 5
 
-#define SEVENZYYEARS 2208988800UL
 #define interrupcao 2
 
 // page0
@@ -139,6 +140,9 @@ NexComboBox comboRede = NexComboBox(9, 10, "txtRede");//Funcionou com 9.
 NexText txtSenha = NexText(9, 4, "txtSenha");
 NexText txtConexao = NexText(9, 7, "txtConexao");
 NexButton btnConectar = NexButton(9, 6, "btnConectar");
+NexText txtData = NexText(9, 11, "txtData");
+NexText txtHora = NexText(9, 10, "txtHora");
+NexButton btnSincr = NexButton(9, 9, "btnSincr");
 
 //page9 popup p/ liberar produtos
 NexText txtComanda = NexText(11, 3, "txtComanda");
@@ -206,7 +210,6 @@ int K_valvula_11;
 RtcDS3231<TwoWire> Rtc(Wire);
 boolean isSdOk;
 
-unsigned long currentEpoc = 0;
 unsigned long timeOffset = -3;
 const int minutosOffset = 3;
 volatile bool modoStatus;
@@ -740,6 +743,8 @@ bool validarTratamento() {
 }
 
 //========================= RTC ==========================================
+#define countof(a) (sizeof(a) / sizeof(a[0]))
+
 void initRTC(){
    Rtc.Begin();
    if (!Rtc.GetIsRunning())
@@ -749,29 +754,6 @@ void initRTC(){
    }
    Rtc.Enable32kHzPin(false);
    Rtc.SetSquareWavePin(DS3231SquareWavePin_ModeAlarmOne); //Habilta 1 alarme
-
-/*
-  TODO
-  if(conectado){
-    msgLoading.setText("Conectado. Sincronizando relogio...");
-    if(sincronizarServidorNtp()){
-      ajustarRelogio();
-
-      RtcDateTime now = Rtc.GetDateTime();
-      char data[11];
-      char hora[7];
-      snprintf_P(data, sizeof(data), PSTR("%02u/%02u/%04u"), now.Day(), now.Month(), now.Year());
-      snprintf_P(hora, sizeof(hora), PSTR("%02u:%02u"), now.Hour(), now.Minute());
-    
-      String msgRelogio = "Relogio: " + String(data) + " " + String(hora);
-      msgLoading.setText(msgRelogio.c_str());
-    }else{
-      msgLoading.setText("Nao sincronizou com servidor NTP.");
-    }
-  }
-  
-  
-  */
 }
 
 void interrupcaoRtc(){
@@ -801,7 +783,7 @@ bool sincronizarServidorNtp(){
     int tentativas  = 0;
     while(!registrou && tentativas < TENTATIVAS_NTP){
       Serial.println("registrando udp.");
-      registrou = wifiSerial.registerUDP("200.160.7.186", 123); //a.st1.ntp.br
+      registrou = wifiSerial.registerUDP("201.49.148.135", 123); //a.st1.ntp.br
       tentativas++;
     }
     Serial.println("registrou udp.");
@@ -821,18 +803,20 @@ bool sincronizarServidorNtp(){
     bool enviou = false;
     uint32_t len = 0;
     tentativas  = 0;
-    while((!enviou || len <= 0) && tentativas < TENTATIVAS_NTP){
+    while(len == 0 && tentativas < TENTATIVAS_NTP){
       Serial.println("enviando requisicao.");
-      enviou = wifiSerial.send(ntpData, 48);
-      len = wifiSerial.recv(buffr, sizeof(buffr), 3000);
+      wifiSerial.send(ntpData, 48);
+      len = wifiSerial.recv(buffr, sizeof(buffr), 5000);
       tentativas++;
     }
-    Serial.println("resposta recebida do servidor.");
+    
     if (len > 0) {
+      Serial.println("resposta recebida do servidor.");
       Serial.print("len: ");
       Serial.print(len);
       Serial.println(" bytes received. ");      
     }else{
+      Serial.println("sem resposta do servidor.");
       return false;
     }
     
@@ -846,14 +830,46 @@ bool sincronizarServidorNtp(){
     // this is NTP time (seconds since Jan 1 1900):
     unsigned long secsSince1900 = highWord << 16 | lowWord;
 
-    currentEpoc = secsSince1900 - SEVENZYYEARS + timeOffset*3600;
-    setTime(currentEpoc);    
+    Serial.print("seconds since 1900: ");
+    Serial.println(secsSince1900);
+
+    unsigned long SEVENZYYEARS = 2208988800;//70 years = 2,208,988,800 seconds
+
+    unsigned long currentEpoc = secsSince1900 - SEVENZYYEARS;// + timeOffset*3600;
+
+    stamp.getDateTime(currentEpoc);
+        
     return true;  
 }
 
 void ajustarRelogio(){
-    RtcDateTime compiled = RtcDateTime(year(), month(), day(), hour(), minute(), second(), false);
+    RtcDateTime compiled = RtcDateTime(stamp.year, stamp.month, stamp.day, stamp.hour, stamp.minute, stamp.second, false);
     Rtc.SetDateTime(compiled);
+}
+
+void btnSincrPopCallback(void *ptr) {
+
+  if(conectado){
+    txtConexao.setText("Conectado. Sincronizando relogio...");
+    if(sincronizarServidorNtp()){
+      ajustarRelogio();
+	    mostrarDataHora();
+      txtConexao.setText("Conectado. Relogio sincronizado.");
+    }else{
+      txtConexao.setText("Nao sincronizou com servidor NTP.");
+    }
+  }
+}
+
+void mostrarDataHora(){	
+	RtcDateTime myrtc = Rtc.GetDateTime();
+    char data[11];
+    char hora[7];
+    snprintf_P(data, countof(data), PSTR("%02u/%02u/%04u"), myrtc.Day(), myrtc.Month(), myrtc.Year());
+    snprintf_P(hora, countof(hora), PSTR("%02u:%02u"), myrtc.Hour(), myrtc.Minute());
+	
+	txtData.setText(data);
+	txtHora.setText(hora);
 }
 
 //=========================CARTAO SD =====================================
@@ -900,7 +916,7 @@ void initSdCard() {
   }
 }
 
-#define countof(a) (sizeof(a) / sizeof(a[0]))
+
 
 String prepararDadosSdShampoo() {
   String msg = "Shampoo ";
@@ -1022,6 +1038,74 @@ void lerDadosBasicos(){
     Serial.print(F("error opening "));
     Serial.println(F("INF.txt"));
   }
+}
+
+bool procurarRedes() {
+
+  if (!isSdOk)
+    return false;
+
+  String str = wifiSerial.getAPList();
+
+  str.trim();
+  if(str.length() == 0)
+    return false;
+  
+  String redes[10] = {""};
+  int i = 0;
+
+  char buff[1024];
+  str.toCharArray(buff, 1024);
+
+  char *pt;
+
+  pt = strtok(buff, "+");
+  while (pt && i < 10) {
+    String r = getNomeRede(pt);
+    Serial.println(r);
+    if (r.length() > 0)
+      redes[i++] = r;
+    pt = strtok(NULL, "+");
+  }
+  
+  
+  String filename = "wifi.txt";
+  String msg = ""; 
+
+  if (!SD.exists(filename)) {
+    return false;
+  } 
+
+  bool encontrou = false;
+
+  File arquivo = SD.open(filename);
+  if (arquivo) {
+    while (arquivo.available()) {
+      String redeNome = arquivo.readStringUntil('\n');      
+      String redeSenha = arquivo.readStringUntil('\n');
+ 
+      for(int j = 0; j < i; j++){
+        if (redes[j].equals(redeNome)) {
+          msg = "Conectando na rede "+redeNome+"...";
+          msgLoading.setText(msg.c_str());
+        conectado = conectarWifi(redeNome, redeSenha, TENTATIVAS_CONEXAO);
+          if(conectado){
+             redeConectada = redeNome;
+         senhaConectada = redeSenha; 
+             encontrou = true;
+             break;
+          }
+        }
+      }
+      if(encontrou)
+        break;
+    }
+    arquivo.close();
+  } else {
+    Serial.print(F("error opening "));
+    Serial.println(filename);
+  }
+  return encontrou;
 }
 
 bool procurarRede(String rede, String senha, String filename) {
@@ -1428,8 +1512,6 @@ void iniciarWifi() {
   String senha = "";
   String msg = "";
   
-  picWifi.setPic(PIC_DESCONECTADO);
-
   wifiSerial.restart();
   conectado = false;
 
@@ -1441,33 +1523,10 @@ void iniciarWifi() {
       Serial.print(F("to station err\r\n"));
     }
   }
-  
-  if (SD.exists(arquivo)) {
-    File forigem = SD.open(arquivo);
-    if (forigem) {
-      while (forigem.available()) {
-        nomeRede = forigem.readStringUntil('\n');
-        senha = forigem.readStringUntil('\n');
-        msg = "Conectando na rede "+nomeRede+"...";
-        msgLoading.setText(msg.c_str());
-        conectado = conectarWifi(nomeRede, senha, TENTATIVAS_CONEXAO);
-        if (conectado){
-          redeConectada = nomeRede;
-		      senhaConectada = senha;    
-          break;
-        }
-      }
-      forigem.close();    
-    }
-  }
 
-  if (conectado) {
-    msgLoading.setText("Conectado");
-    picWifi.setPic(PIC_CONECTADO);
-  } else {
-    msgLoading.setText("Desconectado");
-    picWifi.setPic(PIC_DESCONECTADO);
-  }
+  procurarRedes();
+  
+  msgLoading.setText(conectado?"Conectado":"Desconectado");
 
   delay(1000);
 }
@@ -1517,17 +1576,27 @@ void btnConectarPushCallback(void *ptr) {
   txtSenha.getText(buffSenha, sizeof(buffSenha));
   String senha(buffSenha);
 
-  //TODO validacao nome e senha
+  nomeRede.trim();
+  senha.trim();
+  
+  if(nomeRede.length() == 0){
+    txtConexao.setText("Rede obrigatoria");
+	return;  
+  }
+  
+  if(senha.length() == 0){
+	txtConexao.setText("Senha obrigatoria");
+	return;
+  }
 
   txtConexao.setText("Conectando...");
   String n = nomeRede.substring(0, nomeRede.indexOf("\r")); //nextion coloca \r no final da string
   String s = senha.substring(0, senha.indexOf("\r"));
   conectado = conectarWifi(n, s, TENTATIVAS_CONEXAO);
-  picWifi.setPic(conectado?PIC_CONECTADO:PIC_DESCONECTADO);
   
   if (conectado) {
     redeConectada = n;
-	  senhaConectada = s;
+	senhaConectada = s;
     String msg = "Conectado na rede " + nomeRede;
     char buff2[1024];
     msg.toCharArray(buff2, sizeof(buff2));
@@ -1545,7 +1614,7 @@ void btnConectarPushCallback(void *ptr) {
     msg.toCharArray(buff3, sizeof(buff3));
     txtConexao.setText(buff3);
     redeConectada = "";
-	  senhaConectada = "";
+	senhaConectada = "";
   }
   
   txtSenha.setText("");
@@ -1655,15 +1724,15 @@ String prepararDadosWifiMapping() {
 
 void btnWifiPopCallback(void *ptr) {
   page9.show();
+
+  mostrarDataHora();
+  
   txtSenha.setText("");
   comboRede.setText("");
   
   txtConexao.setText("Procurando redes wifi...");
   buscarRedesDisponiveis();
 
-  //txtConexao.setText("Lendo IP remoto...");
-  //lerIpComputadorRemoto();
-//
   txtConexao.setText("Verificando conexao...");
 
   bool pingou = isConectado();
@@ -1678,7 +1747,8 @@ void btnWifiPopCallback(void *ptr) {
     txtConexao.setText("Desconectado");
     redeConectada = "";
   }
-
+  
+      
 }
 
 void buscarRedesDisponiveis() {
@@ -2290,6 +2360,7 @@ NexTouch *nex_listen_list[] = {
   &btnMapping,
   &btMixMap,
   &btnInativar,
+  &btnSincr,
   NULL
 };
 
@@ -2391,6 +2462,8 @@ void setup() {
   btnCadastro.attachPush(btnCadastroPushCallback, &btnCadastro);
   btnGerenciar.attachPop(btnGerenciarPopCallback);
   btnInativar.attachPush(btnInativarPushCallback, &btnInativar);
+  
+  btnSincr.attachPop(btnSincrPopCallback);
     
   gotoPage0();
 }
@@ -2401,13 +2474,7 @@ void loop() {
   
   if(modoStatus){
     conectado = isConectado();
-    //if(!conectado){
-      //wifiSerial.restart();
-      //conectado = conectarWifi(redeConectada, senhaConectada, 2);
-//      if(conectado && sincronizarServidorNtp())
-//        ajustarRelogio();
-    //}
-    //picWifi.setPic(conectado?PIC_CONECTADO:PIC_DESCONECTADO); imagem de conexao aparecia em outras telas
+	
     if(conectado)
       enviarJson(criarMensagemJsonStatus(), "/api/maquina/sit/");
     setarAlarme();
