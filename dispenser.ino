@@ -54,6 +54,7 @@ NexButton btnCadastro = NexButton(0, 4, "btnCadastro");
 NexButton btnMapping = NexButton(0, 6, "bt2");
 NexPicture picWifi = NexPicture(0, 7, "p0");
 NexText txtPage0 = NexText(0, 8, "t0");
+bool inPage0 = false;
 
 // page1
 NexDSButton btRegenerant = NexDSButton(1, 5, "bt1");
@@ -65,6 +66,7 @@ NexText volumeShampoo = NexText(1, 2, "t0");
 NexButton btMix = NexButton(1, 4, "bt6");
 NexPicture picPhotoactiveSh = NexPicture(1, 9, "p0");
 NexButton btPhotoactiveSh = NexButton(1, 1, "bt0");
+NexButton btnVoltar1 = NexButton(1, 3, "bt5");
 
 // page2
 NexDSButton btNutriTr = NexDSButton(2, 5, "bt1");
@@ -86,6 +88,8 @@ NexSlider slDiscipline = NexSlider(2, 17, "h3");
 NexSlider slAntibreak = NexSlider(2, 18, "h4");
 NexSlider slGrowth = NexSlider(2, 19, "h5");
 NexSlider slCurly = NexSlider(2, 20, "h6");
+
+NexButton btnVoltar2 = NexButton(2, 2, "bt8");
 
 //page3
 NexText msgLoading = NexText(3, 2, "t0");
@@ -122,6 +126,7 @@ NexButton btnRele9At = NexButton(7, 38, "b9");
 NexText txtMsgAt = NexText(6, 39, "txtMsg");
 
 NexButton btnAtualizar = NexButton(7, 14, "btnAtualizar"); //Por algum motivo, usar 6 nao funciona. Funcionou com 7.
+NexButton btnVoltar7 = NexButton(7, 13, "b0");
 
 // page7 cadastro de usuarios
 NexText cadastroOutput = NexText(8, 16, "t8"); //Funcionou com 8.
@@ -134,6 +139,7 @@ NexCheckbox cGerente = NexCheckbox(8, 11, "c0");
 NexCheckbox cTecnico = NexCheckbox(8, 12, "c1");
 NexButton btnGerenciar = NexButton(8, 17, "b0");
 NexText txtTecnico = NexText(8, 13, "t9");
+NexButton btnVoltar8 = NexButton(8, 2, "btnVoltar");
 
 //page8 conexao com a internet
 NexComboBox comboRede = NexComboBox(9, 10, "txtRede");//Funcionou com 9.
@@ -143,6 +149,7 @@ NexButton btnConectar = NexButton(9, 6, "btnConectar");
 NexText txtData = NexText(9, 11, "txtData");
 NexText txtHora = NexText(9, 10, "txtHora");
 NexButton btnSincr = NexButton(9, 9, "btnSincr");
+NexButton btnVoltar9 = NexButton(9, 5, "b0");
 
 //page9 popup p/ liberar produtos
 NexText txtComanda = NexText(11, 3, "txtComanda");
@@ -166,6 +173,7 @@ NexDSButton btnCurto = NexDSButton(14, 3, "bt3");
 NexDSButton btnMedio = NexDSButton(14, 4, "bt4");
 NexDSButton btnLongo = NexDSButton(14, 5, "bt5");
 NexButton btMixMap = NexButton(14, 2, "btMix");
+NexButton btnVoltar14 = NexButton(14, 1, "btVoltar");
 
 // paginas
 NexPage page0 = NexPage(0, 0, "page0");
@@ -211,15 +219,17 @@ RtcDS3231<TwoWire> Rtc(Wire);
 boolean isSdOk;
 
 unsigned long timeOffset = -3;
-const int minutosOffset = 3;
+const int minutosOffset = 2;
 volatile bool modoStatus;
 //===================wifi===============
 bool conectado = false;
 String redeConectada = "";
 String senhaConectada = "";
 
-int numComandasOffline;
 const int MAX_COMANDAS_OFFLINE = 20;
+
+String HOST_NAME = "teste.k08.com.br";
+int HOST_PORT = 80;
 //=======================================
 String profissional = "";
 String numeroComanda = "";
@@ -228,7 +238,6 @@ const String BDPROFISSIONAIS = "PRO.TXT";
 const String BDGERENTES = "GER.TXT";
 const String BDTECNICOS = "TEC.TXT";
 const String BDMASTER = "MTR.TXT";
-
 //=======================CODIGOS===============
 String codMaquina = "";
 String codSalao = "";
@@ -546,10 +555,11 @@ void btnProximoPopCallback(void *ptr) {
   }
 }
 
-void btnRelesPushCallback(void *ptr) {
+void btnRelesPushCallback(void *ptr) {  
   resetarPopupSenha();
   opcao = RELES;
   page12.show();
+  inPage0 = false;
 }
 
 void btnAtualizarPushCallback(void *ptr) {
@@ -749,7 +759,7 @@ void initRTC(){
    Rtc.Begin();
    if (!Rtc.GetIsRunning())
    {
-       Serial.println("RTC was not actively running, starting now");
+       Serial.println(F("RTC was not actively running, starting now"));
        Rtc.SetIsRunning(true);
    }
    Rtc.Enable32kHzPin(false);
@@ -782,11 +792,11 @@ bool sincronizarServidorNtp(){
     bool registrou = false;
     int tentativas  = 0;
     while(!registrou && tentativas < TENTATIVAS_NTP){
-      Serial.println("registrando udp.");
+      Serial.println(F("registrando udp."));
       registrou = wifiSerial.registerUDP("201.49.148.135", 123); //a.st1.ntp.br
       tentativas++;
     }
-    Serial.println("registrou udp.");
+    Serial.println(F("registrou udp."));
     byte ntpData[48] = {0};
     byte buffr[48] = {0};
     //ntpData[0] = 0x1B;
@@ -804,24 +814,24 @@ bool sincronizarServidorNtp(){
     uint32_t len = 0;
     tentativas  = 0;
     while(len == 0 && tentativas < TENTATIVAS_NTP){
-      Serial.println("enviando requisicao.");
+      Serial.println(F("enviando requisicao."));
       wifiSerial.send(ntpData, 48);
       len = wifiSerial.recv(buffr, sizeof(buffr), 5000);
       tentativas++;
     }
     
     if (len > 0) {
-      Serial.println("resposta recebida do servidor.");
-      Serial.print("len: ");
+      Serial.println(F("resposta recebida do servidor."));
+      Serial.print(F("len: "));
       Serial.print(len);
-      Serial.println(" bytes received. ");      
+      Serial.println(F(" bytes received. "));      
     }else{
-      Serial.println("sem resposta do servidor.");
+      Serial.println(F("sem resposta do servidor."));
       return false;
     }
     
     if (wifiSerial.unregisterUDP()) {
-        Serial.print("unregister udp ok\r\n");
+        Serial.print(F("unregister udp ok\r\n"));
     }
 
     unsigned long highWord = word(buffr[40], buffr[41]);
@@ -830,7 +840,7 @@ bool sincronizarServidorNtp(){
     // this is NTP time (seconds since Jan 1 1900):
     unsigned long secsSince1900 = highWord << 16 | lowWord;
 
-    Serial.print("seconds since 1900: ");
+    Serial.print(F("seconds since 1900: "));
     Serial.println(secsSince1900);
 
     unsigned long SEVENZYYEARS = 2208988800;//70 years = 2,208,988,800 seconds
@@ -853,11 +863,14 @@ void btnSincrPopCallback(void *ptr) {
     txtConexao.setText("Conectado. Sincronizando relogio...");
     if(sincronizarServidorNtp()){
       ajustarRelogio();
+      setarAlarme();
 	    mostrarDataHora();
       txtConexao.setText("Conectado. Relogio sincronizado.");
     }else{
       txtConexao.setText("Nao sincronizou com servidor NTP.");
     }
+  }else{
+    txtConexao.setText("Conecte para sincronizar o relogio.");
   }
 }
 
@@ -1040,31 +1053,42 @@ void lerDadosBasicos(){
   }
 }
 
-bool procurarRedes() {
+bool iniciarConectar() {
 
   if (!isSdOk)
     return false;
 
-  String str = wifiSerial.getAPList();
+  String str = "";
+
+  int tentativas = 0;
+  msgLoading.setText("Procurando redes wifi...");
+
+  while(str.length() == 0 && tentativas < TENTATIVAS_CONEXAO){
+    str = wifiSerial.getAPList();
+    tentativas++;
+  }
 
   str.trim();
-  if(str.length() == 0)
+  
+  if(str.length() == 0){
+    msgLoading.setText("Nenhuma rede encontrada");
+    delay(2000);
     return false;
+  }
   
   String redes[10] = {""};
-  int i = 0;
 
   char buff[1024];
   str.toCharArray(buff, 1024);
 
   char *pt;
-
+  int i = 0;
+    
   pt = strtok(buff, "+");
   while (pt && i < 10) {
     String r = getNomeRede(pt);
-    Serial.println(r);
     if (r.length() > 0)
-      redes[i++] = r;
+      redes[i++] = r.substring(0, r.indexOf('\r')); 
     pt = strtok(NULL, "+");
   }
   
@@ -1076,28 +1100,28 @@ bool procurarRedes() {
     return false;
   } 
 
-  bool encontrou = false;
+  bool conectou = false;
 
   File arquivo = SD.open(filename);
   if (arquivo) {
     while (arquivo.available()) {
       String redeNome = arquivo.readStringUntil('\n');      
       String redeSenha = arquivo.readStringUntil('\n');
- 
-      for(int j = 0; j < i; j++){
+
+      for(int j = 0; j < i; j++){       
         if (redes[j].equals(redeNome)) {
+          
           msg = "Conectando na rede "+redeNome+"...";
           msgLoading.setText(msg.c_str());
-        conectado = conectarWifi(redeNome, redeSenha, TENTATIVAS_CONEXAO);
-          if(conectado){
+          conectou = conectarWifi(redeNome, redeSenha, TENTATIVAS_CONEXAO);
+          if(conectou){
              redeConectada = redeNome;
-         senhaConectada = redeSenha; 
-             encontrou = true;
+             senhaConectada = redeSenha; 
              break;
           }
         }
       }
-      if(encontrou)
+      if(conectou)
         break;
     }
     arquivo.close();
@@ -1105,7 +1129,13 @@ bool procurarRedes() {
     Serial.print(F("error opening "));
     Serial.println(filename);
   }
-  return encontrou;
+
+  if(!conectou){
+    redeConectada = "";
+    senhaConectada = "";
+  }
+  
+  return conectou;
 }
 
 bool procurarRede(String rede, String senha, String filename) {
@@ -1181,20 +1211,20 @@ String prepararDadosSdMapping() {
 //==========================================JSON===========================================================
 String criarMensagemJsonShampoo() {
   StaticJsonDocument<200> doc;
-  doc["codMaquina"] = codMaquina;
-  doc["codSalao"] = codSalao;
-  doc["codUsuario"] = codUsuario;
+  doc["codMaquina"] = codMaquina.toInt();
+  doc["codSalao"] = codSalao.toInt();
+  doc["codUsuario"] = codUsuario.toInt();
   doc["nomeUsuario"] = profissional;
-  doc["numero"] = numeroComanda;
+  doc["numero"] = numeroComanda.toInt();
   doc["photoactive"] = photoactive;
   doc["volumeTotal"] = volume;
   doc["tipo"] = 0;
 
-  RtcDateTime now = Rtc.GetDateTime();
+  RtcDateTime agora = Rtc.GetDateTime();
   char data[11];
   char hora[9];
-  snprintf_P(data, countof(data), PSTR("%04u-%02u-%02u"), now.Year(), now.Month(), now.Day());
-  snprintf_P(hora, countof(hora), PSTR("%02u:%02u:%02u"), now.Hour(), now.Minute(), now.Second());
+  snprintf_P(data, countof(data), PSTR("%04u-%02u-%02u"), agora.Year(), agora.Month(), agora.Day());
+  snprintf_P(hora, countof(hora), PSTR("%02u:%02u:%02u"), agora.Hour(), agora.Minute(), agora.Second());
   doc["data"] = String(data)+" "+String(hora);
 
   JsonArray items = doc.createNestedArray("items");
@@ -1229,7 +1259,7 @@ String criarMensagemJsonShampoo() {
 }
 
 String criarMensagemJsonTratamento(unsigned long n, unsigned long volumeCondicionador[]) {
-  StaticJsonDocument<200> doc;
+  StaticJsonDocument<220> doc;
   doc["codMaquina"] = codMaquina;
   doc["codSalao"] = codSalao;
   doc["codUsuario"] = codUsuario;
@@ -1258,8 +1288,6 @@ String criarMensagemJsonTratamento(unsigned long n, unsigned long volumeCondicio
   }
   String json = "";
   serializeJson(doc, json);
-  Serial.println("DADOS:");
-  Serial.println(json);
   return json;
 }
 
@@ -1311,7 +1339,7 @@ String criarMensagemJsonStatus(){
   RtcDateTime agora = Rtc.GetDateTime();
   
   StaticJsonDocument<200> doc;
-  doc["codigo"] = codMaquina;
+  doc["codigo"] = codMaquina.toInt();
   
   char data[12];
   char hora[10];
@@ -1326,43 +1354,47 @@ String criarMensagemJsonStatus(){
 
 bool enviarJson(String data, String uri)
 {
-  uint8_t buffr[1024] = {0};
-
-  String HOST_NAME = "teste.k08.com.br";
-  int HOST_PORT = 80;
+  uint8_t buffr[256] = {0};
 
   if (wifiSerial.createTCP(HOST_NAME, HOST_PORT)) {
-    Serial.print("create tcp ok\r\n");
+    Serial.print(F("create tcp ok\r\n"));
   } else {
-    Serial.print("create tcp err\r\n");
+    Serial.print(F("create tcp err\r\n"));
     return false;
   } 
 
   String server = HOST_NAME + ":" + HOST_PORT;
    
   String postRequest =
-    "POST " + uri + " HTTP/1.0\r\n" +
-    "Host: " + server + "\r\n" +
-    "Accept: *" + "/" + "*\r\n" +
-    "Content-Length: " + data.length() + "\r\n" +
-    "Content-Type: application/json\r\n" +
-    "\r\n" + data;
+    "POST " + uri + " HTTP/1.0\r\nHost: " + server + "\r\nAccept: */*\r\nContent-Length: " +
+    data.length() + "\r\nContent-Type: application/json\r\n\r\n" + data;
 
   Serial.println(data);
-  wifiSerial.send(postRequest.c_str(), postRequest.length());
+  Serial.print(F("postRequest: "));
+  Serial.println(postRequest);
+
+  //estourou tamanho da string
+  if(postRequest.length() == 0)
+    return false;
+  
+   bool teste = wifiSerial.send(postRequest.c_str(), postRequest.length());
+   Serial.print(F("Send: "));
+   Serial.println(teste);
 
   uint32_t len = wifiSerial.recv(buffr, sizeof(buffr), 10000);
-  Serial.print("size recebido do server json ");
+  Serial.print(F("size recebido do server json "));
   Serial.println(len);
   if (len > 0) {
-    Serial.print("Received:[");
+    Serial.print(F("Received:["));
     for (uint32_t i = 0; i < len; i++) {
       Serial.print((char)buffr[i]);
     }
-    Serial.print("]\r\n");
+    Serial.print(F("]\r\n"));
   }
+  wifiSerial.releaseTCP();
   return true;
 }
+
 //=======================CONFIGURACAO DAS VALVULAS=======================
 void lerConfiguracaoValvulas() {
   int tempos[QTDVALVULAS] = {0};
@@ -1473,8 +1505,20 @@ void inicializarEeprom() {
 
 //===============================WIFI=============================================
 bool isConectado(){
-  bool conectado = wifiSerial.ping("8.8.8.8");
-  return conectado;
+// nao funcionaram
+//  bool ok = false;
+//  if (wifiSerial.createTCP("teste.k08.com.br", "80")) {
+//    ok = true;
+//  }
+//  wifiSerial.releaseTCP();
+//  return ok;
+//  bool conectado = wifiSerial.ping("8.8.8.8");
+//  return conectado;
+
+  if(redeConectada.length() > 0 && senhaConectada.length() > 0)
+    return wifiSerial.joinAP(redeConectada, senhaConectada);
+
+  return false;
 }
 
 bool conectarWifi(String nomeRede, String senha, int tentativas) {
@@ -1505,30 +1549,21 @@ void enviarDadosWifi(String msg) {
 }
 
 void iniciarWifi() {
-  msgLoading.setText("Conectando...");
   
-  String arquivo = "wifi.txt";
-  String nomeRede = "";
-  String senha = "";
-  String msg = "";
-  
-  wifiSerial.restart();
-  conectado = false;
-
-  for (int i = 0; i < TENTATIVAS_CONEXAO; i++) {
+  //for (int i = 0; i < TENTATIVAS_CONEXAO; i++) {
     if (wifiSerial.setOprToStation()) {
       Serial.print(F("to station ok\r\n"));
-      break;
+      //break;
     } else {
       Serial.print(F("to station err\r\n"));
     }
-  }
+  //}
 
-  procurarRedes();
-  
+  conectado = iniciarConectar();
+          
   msgLoading.setText(conectado?"Conectado":"Desconectado");
 
-  delay(1000);
+  delay(2000);
 }
 
 int contarLinhas(String arquivo) { 
@@ -1554,14 +1589,16 @@ bool reenviarDadosTemporarios() {
     File forigem = SD.open(arquivo);
     if (forigem) {
       enviou = true;
+           
       while (forigem.available()) {
         String linha = forigem.readStringUntil('\n');
         enviarJson(linha,"/api/comanda/adiciona/");
-      }
+      }      
       forigem.close();
       SD.remove(arquivo);
     }
   }
+  delay(500);
   return enviou;
 }
 
@@ -1596,7 +1633,7 @@ void btnConectarPushCallback(void *ptr) {
   
   if (conectado) {
     redeConectada = n;
-	senhaConectada = s;
+	  senhaConectada = s;
     String msg = "Conectado na rede " + nomeRede;
     char buff2[1024];
     msg.toCharArray(buff2, sizeof(buff2));
@@ -1614,7 +1651,7 @@ void btnConectarPushCallback(void *ptr) {
     msg.toCharArray(buff3, sizeof(buff3));
     txtConexao.setText(buff3);
     redeConectada = "";
-	senhaConectada = "";
+	  senhaConectada = "";
   }
   
   txtSenha.setText("");
@@ -1724,6 +1761,11 @@ String prepararDadosWifiMapping() {
 
 void btnWifiPopCallback(void *ptr) {
   page9.show();
+  inPage0 = false;
+
+  if(!wifiSerial.kick()){
+    wifiSerial.restart();
+  }
 
   mostrarDataHora();
   
@@ -1735,24 +1777,36 @@ void btnWifiPopCallback(void *ptr) {
 
   txtConexao.setText("Verificando conexao...");
 
-  bool pingou = isConectado();
-  if (pingou) {
+  conectado = isConectado();
+
+  if (conectado) {
+    String msg = "Conectado na rede "+redeConectada;
     txtConexao.Set_font_color_pco(1024);
-    txtConexao.setText("Conectado");
-    char buffR[128];
-    redeConectada.toCharArray(buffR, sizeof(buffR));
-    comboRede.setText(buffR);
+    txtConexao.setText(msg.c_str());
+    //char buffR[128];
+    //redeConectada.toCharArray(buffR, sizeof(buffR));
+    //comboRede.setText(buffR);
   } else {
     txtConexao.Set_font_color_pco(63488);
     txtConexao.setText("Desconectado");
     redeConectada = "";
+    senhaConectada = "";
   }
   
       
 }
 
 void buscarRedesDisponiveis() {
-  String str = wifiSerial.getAPList();
+
+  String str = "";
+  int tentativas = 0;
+  while(str.length() == 0 && tentativas < TENTATIVAS_CONEXAO){
+    str = wifiSerial.getAPList();
+    tentativas++;
+  }
+
+  str.trim();
+  
   String redes = "";
 
   char buff[1024];
@@ -1794,15 +1848,22 @@ String getNomeRede(char * ptr) {
 
 void btnShampooPushCallback(void *ptr) {
   resetarVariaveisShampoo();
+  page1.show();
+  inPage0 = false;
+  volumeShampoo.setText("");  
 }
 
 void btnTreatmentPushCallback(void *ptr) {
   resetarVariaveisTratamento();
+  page2.show();
+  inPage0 = false;
+  volumeTratamento.setText("");
 }
 
 void btnMappingPushCallback(void *ptr) {
   opcaoMapping=NONE;
   page14.show();
+  inPage0 = false;
 }
 
 void btnFecharGerenciarPopCallback(void *ptr) {
@@ -1814,6 +1875,7 @@ void btnCadastroPushCallback(void *ptr) {
   resetarPopupSenha();
   opcao = CADASTRO;
   page12.show();
+  inPage0 = false;
 }
 
 void btnInativarPushCallback(void *ptr, int pos) {
@@ -1829,7 +1891,7 @@ void btnInativarPushCallback(void *ptr, int pos) {
   int fimSeparador = nomeSenhaStatus.lastIndexOf("^");
 
   String perfil = nomeSenhaStatus.substring(iniSeparador + 1, fimSeparador);
-  Serial.print("perfil: ");  
+  Serial.print(F("perfil: "));  
   Serial.println(perfil);  
   String usuario = nomeSenhaStatus.substring(0, iniSeparador);
    
@@ -2101,9 +2163,9 @@ void rodaShampoo() {
 
     gravarSD(prepararDadosSdShampoo(), "sham.txt");
 
-	String dadosWifi = criarMensagemJsonShampoo();
+    String dadosWifi = criarMensagemJsonShampoo();
     bool enviou = enviarJson(dadosWifi, "/api/comanda/adiciona/");
-
+  
     if (enviou) {
       reenviarDadosTemporarios();
       delay(500);
@@ -2150,7 +2212,8 @@ void rodaTratamento() {
     page5.show();//retire seu produto
 
     gravarSD(prepararDadosSdTratamento(volumeBase, volumeCondicionador), "trat.txt");
-	String dadosWifi = criarMensagemJsonTratamento(n, volumeCondicionador);
+    
+	  String dadosWifi = criarMensagemJsonTratamento(n, volumeCondicionador);
     bool enviou = enviarJson(dadosWifi, "/api/comanda/adiciona/");
     
     if (enviou) {
@@ -2223,6 +2286,21 @@ void rodaMapping() {
   gotoPage0();
 }
 
+
+bool validarComandasEmEspera(){
+  int emEspera = contarLinhas("tmp.txt");
+  if(emEspera < MAX_COMANDAS_OFFLINE){
+    String msg = String(emEspera) +" comandas em espera. Limite: "+ String(MAX_COMANDAS_OFFLINE); 
+    txtPage0.setText(msg.c_str());
+    return true;
+  }else{
+    String msg = "Máx. de " + String(MAX_COMANDAS_OFFLINE) +" comandas em espera atingido."; 
+    txtMsg.setText(msg.c_str()); 
+    txtPage0.setText(msg.c_str()); 
+    return false;
+  }  
+}
+
 void btnIniciarPopCallback(void *ptr) {
   char buff[11] = {0};
   txtComanda.getText(buff, sizeof(buff));
@@ -2243,23 +2321,27 @@ void btnIniciarPopCallback(void *ptr) {
     return;
   }
 
-  if(!(numComandasOffline < MAX_COMANDAS_OFFLINE)){ 
-    String msg = "Máx. de " + String(MAX_COMANDAS_OFFLINE) +" comandas sem internet atingido."; 
-    txtMsg.setText(msg.c_str()); 
-	txtPage0.setText(msg.c_str());     
-    return; 
-  } 
+  if(!validarComandasEmEspera()){
+    return;
+  }
+
+//  if(!(numComandasOffline < MAX_COMANDAS_OFFLINE)){ 
+//    String msg = "Máx. de " + String(MAX_COMANDAS_OFFLINE) +" comandas sem internet atingido."; 
+//    txtMsg.setText(msg.c_str()); 
+//	txtPage0.setText(msg.c_str());     
+//    return; 
+//  } 
    
-  conectado = isConectado(); 
-  if(!conectado){ 
-    numComandasOffline++; 
-    String msg = String(numComandasOffline) +" comandas sem internet. Limite: "+ String(MAX_COMANDAS_OFFLINE); 
-	txtPage0.setText(msg.c_str()); 
-  }else{ 
-    numComandasOffline = 0; 
-	txtPage0.setText(""); 
-	txtMsg.setText(""); 
-  }  
+//  conectado = isConectado(); 
+//  if(!conectado){ 
+//    numComandasOffline++; 
+//    String msg = String(numComandasOffline) +" comandas sem internet. Limite: "+ String(MAX_COMANDAS_OFFLINE); 
+//	txtPage0.setText(msg.c_str()); 
+//  }else{ 
+//    numComandasOffline = 0; 
+//	txtPage0.setText(""); 
+//	txtMsg.setText(""); 
+//  }  
 
   if (procurarSenha(strSenha, BDPROFISSIONAIS)) {
     resetarPopupSenha();
@@ -2275,10 +2357,27 @@ void btnIniciarPopCallback(void *ptr) {
   }
 }
 
+//========================================VOLTAR===============================================
+void btnVoltar9PopCallback(void *ptr) {
+  gotoPage0();
+}
+void btnVoltar8PopCallback(void *ptr) {
+  gotoPage0();
+}
+void btnVoltar7PopCallback(void *ptr) {
+  gotoPage0();
+}
+void btnVoltar1PopCallback(void *ptr) {
+  gotoPage0();
+}
+void btnVoltar2PopCallback(void *ptr) {
+  gotoPage0();
+}
+void btnVoltar14PopCallback(void *ptr) {
+  gotoPage0();
+}
+
 //=============================================================================================
-void iniciarVariaveisGlobais(){ 
-  numComandasOffline = contarLinhas("tmp.txt");	 
-} 
 
 void definirSaidas() {
   pinMode (RELE1_REGENERANT, OUTPUT);
@@ -2304,6 +2403,7 @@ void definirEntradas() {
 void gotoPage0(){
   page0.show();
   picWifi.setPic(conectado?PIC_CONECTADO:PIC_DESCONECTADO);
+  inPage0 = true;
 }
 
 NexTouch *nex_listen_list[] = {
@@ -2361,6 +2461,12 @@ NexTouch *nex_listen_list[] = {
   &btMixMap,
   &btnInativar,
   &btnSincr,
+  &btnVoltar9,
+  &btnVoltar8,
+  &btnVoltar7,
+  &btnVoltar1,
+  &btnVoltar2,
+  &btnVoltar14,
   NULL
 };
 
@@ -2369,6 +2475,8 @@ void setup() {
 
   nexInit();
   page3.show();
+
+  wifiSerial.leaveAP();
 
   definirEntradas();   
   definirSaidas();
@@ -2379,26 +2487,24 @@ void setup() {
   //inicializarEeprom();
   lerConfiguracaoValvulas();
   initSdCard();
-  modoStatus = true;
-  desconectarWifi(); //modulo conecta na ultima rede assim que ligado
-  //lerIpComputadorRemoto();
+  //modoStatus = true;
 
   lerDadosBasicos();
   
   iniciarWifi();
   
-  initRTC();  
+  initRTC();
+  setarAlarme();  
 
   if (conectado) {
+    enviarJson(criarMensagemJsonStatus(), "/api/maquina/sit/");
     if(reenviarDadosTemporarios()){
       msgLoading.setText("Comandas enviadas com sucesso.");
-      delay(1000);
+      delay(2000);
     }   
   }
 
   msgLoading.setText("");
-
-  iniciarVariaveisGlobais(); 
 
   btnReles.attachPush(btnRelesPushCallback, &btnReles);
   btnCadastrar.attachPop(btnCadastrarPopCallback);
@@ -2464,6 +2570,12 @@ void setup() {
   btnInativar.attachPush(btnInativarPushCallback, &btnInativar);
   
   btnSincr.attachPop(btnSincrPopCallback);
+  btnVoltar9.attachPop(btnVoltar9PopCallback);
+  btnVoltar8.attachPop(btnVoltar8PopCallback);
+  btnVoltar7.attachPop(btnVoltar7PopCallback);
+  btnVoltar1.attachPop(btnVoltar1PopCallback);
+  btnVoltar2.attachPop(btnVoltar2PopCallback);
+  btnVoltar14.attachPop(btnVoltar14PopCallback);
     
   gotoPage0();
 }
@@ -2477,6 +2589,11 @@ void loop() {
 	
     if(conectado)
       enviarJson(criarMensagemJsonStatus(), "/api/maquina/sit/");
+
+    if(inPage0){
+      picWifi.setPic(conectado?PIC_CONECTADO:PIC_DESCONECTADO);
+    }
+      
     setarAlarme();
     modoStatus=false;    
   }
