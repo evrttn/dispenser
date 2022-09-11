@@ -2534,15 +2534,21 @@ void setup() {
   iniciarWifi();
   
   initRTC();
-  setarAlarme();  
 
-  if (conectado) {
+  if(conectado){
+    msgLoading.setText("Sincronizando relogio...");
+    ajustarRelogio(buscarDataHora());
+    msgLoading.setText("Relogio sincronizado.");
+    delay(1000);
+    msgLoading.setText("");
     enviarJson(criarMensagemJsonStatus(), "/api/maquina/sit/");
     if(reenviarDadosTemporarios()){
       msgLoading.setText("Comandas enviadas com sucesso.");
       delay(2000);
-    }   
+    }
   }
+
+  setarAlarme();
 
   msgLoading.setText("");
 
