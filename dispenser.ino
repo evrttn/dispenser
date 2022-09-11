@@ -1241,7 +1241,6 @@ String prepararDadosSdMapping() {
 String criarMensagemJsonShampoo() {
   StaticJsonDocument<200> doc;
   doc["codMaquina"] = codMaquina.toInt();
-  doc["codSalao"] = codSalao.toInt();
   doc["codUsuario"] = codUsuario.toInt();
   doc["nomeUsuario"] = profissional;
   doc["numero"] = numeroComanda.toInt();
@@ -1289,11 +1288,10 @@ String criarMensagemJsonShampoo() {
 
 String criarMensagemJsonTratamento(unsigned long n, unsigned long volumeCondicionador[]) {
   StaticJsonDocument<240> doc;
-  doc["codMaquina"] = codMaquina;
-  doc["codSalao"] = codSalao;
-  doc["codUsuario"] = codUsuario;
+  doc["codMaquina"] = codMaquina.toInt();
+  doc["codUsuario"] = codUsuario.toInt();
   doc["nomeUsuario"] = profissional;
-  doc["numero"] = numeroComanda;
+  doc["numero"] = numeroComanda.toInt();
   doc["photoactive"] = photoactive;
   doc["volumeTotal"] = volumeTotal;
   doc["tipo"] = 1;
@@ -1321,12 +1319,11 @@ String criarMensagemJsonTratamento(unsigned long n, unsigned long volumeCondicio
 }
 
 String criarMensagemJsonMapping() {
-  StaticJsonDocument<200> doc;
-  doc["codMaquina"] = codMaquina;
-  doc["codSalao"] = codSalao;
-  doc["codUsuario"] = codUsuario;
+  StaticJsonDocument<240> doc;
+  doc["codMaquina"] = codMaquina.toInt();
+  doc["codUsuario"] = codUsuario.toInt();
   doc["nomeUsuario"] = profissional;
-  doc["numero"] = numeroComanda;
+  doc["numero"] = numeroComanda.toInt();
   doc["photoactive"] = photoactive;
   doc["tipo"] = 2;
 
@@ -1370,12 +1367,6 @@ String criarMensagemJsonStatus(){
   StaticJsonDocument<100> doc;
   doc["codigo"] = codMaquina.toInt();
 
-  char data[12];
-  char hora[10];
-  snprintf_P(data, sizeof(data), PSTR("%04u-%02u-%02u"), agora.Year(), agora.Month(), agora.Day());
-  snprintf_P(hora, sizeof(hora), PSTR("%02u:%02u:%02u"), agora.Hour(), agora.Minute(), agora.Second());
-  doc["data"] = String(data)+" "+String(hora);
-
   String dados = "";  
   serializeJson(doc, dados);  
   return dados;
@@ -1410,8 +1401,6 @@ String receberJson(String uri){
 
 bool enviarJson(String data, String uri)
 {
-  //uint8_t buffr[300] = {0};
-
   if (wifiSerial.createTCP(HOST_NAME, HOST_PORT)) {
     Serial.print(F("create tcp ok\r\n"));
   } else {
@@ -1429,7 +1418,20 @@ bool enviarJson(String data, String uri)
     return false;
   
   wifiSerial.send(request.c_str(), request.length());
-  //wifiSerial.recv(buffr, sizeof(buffr), 10000); nao precisa
+
+  /*
+  uint8_t buffr[400] = {0};
+  uint32_t len = wifiSerial.recv(buffr, sizeof(buffr), 10000);
+  Serial.print(F("size recebido do server json "));
+  Serial.println(len);
+  if (len > 0) {
+    Serial.print(F("Received:["));
+    for (uint32_t i = 0; i < len; i++) {
+      Serial.print((char)buffr[i]);
+    }
+    Serial.print(F("]\r\n"));
+  }
+  */
 
   wifiSerial.releaseTCP();
   return true;
