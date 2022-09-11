@@ -197,7 +197,7 @@ shampoo opcaoShampoo;
 enum funcionalidade {SHAMPOO, TRATAMENTO, RELES, CADASTRO, MAPPING};
 funcionalidade opcao;
 
-//variaveis shampoo
+//variaveis mapping
 enum mapping {CURTO, MEDIO, LONGO, NONE};
 mapping opcaoMapping;
 
@@ -852,23 +852,52 @@ bool sincronizarServidorNtp(){
     return true;  
 }
 
-void ajustarRelogio(){
-    RtcDateTime compiled = RtcDateTime(stamp.year, stamp.month, stamp.day, stamp.hour, stamp.minute, stamp.second, false);
-    Rtc.SetDateTime(compiled);
+String receberJson(String uri);
+
+String buscarDataHora(){
+
+  String json = receberJson("/api/maquina/datetime/");
+  String dataHora = json.substring(json.indexOf('{'), json.indexOf('}')+1);
+  
+  DynamicJsonDocument doc(64);
+  deserializeJson(doc, dataHora);
+  JsonObject obj = doc.as<JsonObject>();
+
+  String dH = obj["data"].as<String>(); //data: 10/09/2022 21:44:55       
+  return dH;  
+}
+
+void ajustarRelogio(String dataHora){
+  
+  int idx = dataHora.indexOf(" ");
+  String d = dataHora.substring(0, idx);
+  String h = dataHora.substring(idx+1, dataHora.length());
+
+  int idx1 = d.indexOf('/');
+  int idx2 = d.lastIndexOf('/');
+
+  String dia = d.substring(0, idx1);
+  String mes = d.substring(idx1+1, idx2);
+  String ano = d.substring(idx2+1, d.length());
+
+  int idx3 = h.indexOf(':');
+  int idx4 = h.lastIndexOf(':');
+
+  String hora = h.substring(0, idx3);
+  String minuto = h.substring(idx3+1, idx4);
+  String segundo = h.substring(idx4+1, h.length());
+  
+  RtcDateTime compiled = RtcDateTime(ano.c_str(), mes.c_str(), dia.c_str(), hora.c_str(), minuto.c_str(), segundo.c_str());
+  Rtc.SetDateTime(compiled);
 }
 
 void btnSincrPopCallback(void *ptr) {
-
-  if(conectado){
-    txtConexao.setText("Conectado. Sincronizando relogio...");
-    if(sincronizarServidorNtp()){
-      ajustarRelogio();
-      setarAlarme();
-	    mostrarDataHora();
-      txtConexao.setText("Conectado. Relogio sincronizado.");
-    }else{
-      txtConexao.setText("Nao sincronizou com servidor NTP.");
-    }
+  if(conectado){    
+    txtConexao.setText("Sincronizando relogio...");
+    ajustarRelogio(buscarDataHora());
+    setarAlarme();
+	  mostrarDataHora();
+    txtConexao.setText("Relogio sincronizado.");
   }else{
     txtConexao.setText("Conecte para sincronizar o relogio.");
   }
@@ -1259,7 +1288,7 @@ String criarMensagemJsonShampoo() {
 }
 
 String criarMensagemJsonTratamento(unsigned long n, unsigned long volumeCondicionador[]) {
-  StaticJsonDocument<220> doc;
+  StaticJsonDocument<240> doc;
   doc["codMaquina"] = codMaquina;
   doc["codSalao"] = codSalao;
   doc["codUsuario"] = codUsuario;
@@ -1338,9 +1367,9 @@ String criarMensagemJsonMapping() {
 String criarMensagemJsonStatus(){
   RtcDateTime agora = Rtc.GetDateTime();
   
-  StaticJsonDocument<200> doc;
+  StaticJsonDocument<100> doc;
   doc["codigo"] = codMaquina.toInt();
-  
+
   char data[12];
   char hora[10];
   snprintf_P(data, sizeof(data), PSTR("%04u-%02u-%02u"), agora.Year(), agora.Month(), agora.Day());
@@ -1352,9 +1381,36 @@ String criarMensagemJsonStatus(){
   return dados;
 }
 
+//GET request
+String receberJson(String uri){
+  
+  if (wifiSerial.createTCP(HOST_NAME, HOST_PORT)) {
+    Serial.print(F("create tcp ok\r\n"));
+  } else {
+    Serial.print(F("create tcp err\r\n"));
+    return "";
+  } 
+
+  String server = HOST_NAME + ":" + HOST_PORT;
+  
+  String request = "GET " + uri + " HTTP/1.1\r\nHost: " + server + "\r\nAccept: application/hal+json\r\n\r\n";
+
+  //estourou tamanho maximo da string
+  if(request.length() == 0)
+    return "";  
+
+  bool teste = wifiSerial.send(request.c_str(), request.length());
+
+  char buffr[300] = {0};
+  uint32_t len = wifiSerial.recv(buffr, sizeof(buffr), 10000);
+
+  wifiSerial.releaseTCP();
+  return String(buffr);
+}
+
 bool enviarJson(String data, String uri)
 {
-  uint8_t buffr[256] = {0};
+  //uint8_t buffr[300] = {0};
 
   if (wifiSerial.createTCP(HOST_NAME, HOST_PORT)) {
     Serial.print(F("create tcp ok\r\n"));
@@ -1364,33 +1420,17 @@ bool enviarJson(String data, String uri)
   } 
 
   String server = HOST_NAME + ":" + HOST_PORT;
-   
-  String postRequest =
-    "POST " + uri + " HTTP/1.0\r\nHost: " + server + "\r\nAccept: */*\r\nContent-Length: " +
-    data.length() + "\r\nContent-Type: application/json\r\n\r\n" + data;
-
-  Serial.println(data);
-  Serial.print(F("postRequest: "));
-  Serial.println(postRequest);
-
-  //estourou tamanho da string
-  if(postRequest.length() == 0)
+  
+  String request = "POST " + uri + " HTTP/1.0\r\nHost: " + server + "\r\nAccept: */*\r\nContent-Length: " +
+        data.length() + "\r\nContent-Type: application/json\r\n\r\n" + data;
+ 
+  //estourou tamanho maximo da string
+  if(request.length() == 0)
     return false;
   
-   bool teste = wifiSerial.send(postRequest.c_str(), postRequest.length());
-   Serial.print(F("Send: "));
-   Serial.println(teste);
+  wifiSerial.send(request.c_str(), request.length());
+  //wifiSerial.recv(buffr, sizeof(buffr), 10000); nao precisa
 
-  uint32_t len = wifiSerial.recv(buffr, sizeof(buffr), 10000);
-  Serial.print(F("size recebido do server json "));
-  Serial.println(len);
-  if (len > 0) {
-    Serial.print(F("Received:["));
-    for (uint32_t i = 0; i < len; i++) {
-      Serial.print((char)buffr[i]);
-    }
-    Serial.print(F("]\r\n"));
-  }
   wifiSerial.releaseTCP();
   return true;
 }
