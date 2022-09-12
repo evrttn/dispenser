@@ -226,13 +226,14 @@ bool conectado = false;
 String redeConectada = "";
 String senhaConectada = "";
 
-const int MAX_COMANDAS_OFFLINE = 20;
+const int MAX_COMANDAS_OFFLINE = 5;
 
 String HOST_NAME = "teste.k08.com.br";
 int HOST_PORT = 80;
 //=======================================
 String profissional = "";
 String numeroComanda = "";
+String msgComandaEspera = "";
 //=======================BDs====================
 const String BDPROFISSIONAIS = "PRO.TXT";
 const String BDGERENTES = "GER.TXT";
@@ -1638,6 +1639,7 @@ bool reenviarDadosTemporarios() {
       }      
       forigem.close();
       SD.remove(arquivo);
+      msgComandaEspera="";
     }
   }
   delay(500);
@@ -2013,6 +2015,8 @@ void btnFecharPopCallback(void *ptr) {
     page1.show();
   else if (opcao == TRATAMENTO)
     page2.show();
+  else if (opcao == MAPPING)
+    page14.show();
 }
 //===============================RELES============================================
 void btnRele1AtPopCallback(void *ptr) {
@@ -2331,16 +2335,16 @@ void rodaMapping() {
 
 bool validarComandasEmEspera(){
   int emEspera = contarLinhas("tmp.txt");
-  if(emEspera < MAX_COMANDAS_OFFLINE){
-    String msg = String(emEspera) +" comandas em espera. Limite: "+ String(MAX_COMANDAS_OFFLINE); 
-    txtPage0.setText(msg.c_str());
-    return true;
-  }else{
-    String msg = "Máx. de " + String(MAX_COMANDAS_OFFLINE) +" comandas em espera atingido."; 
-    txtMsg.setText(msg.c_str()); 
-    txtPage0.setText(msg.c_str()); 
+  
+  if(emEspera >= MAX_COMANDAS_OFFLINE){    
+    String msg = "Max. de " + String(MAX_COMANDAS_OFFLINE) +" comandas em espera atingido."; 
+    txtMsg.setText(msg.c_str());
+    msgComandaEspera = msg;
     return false;
-  }  
+  }else{
+    msgComandaEspera = String(emEspera) +" comandas em espera. Limite: "+ String(MAX_COMANDAS_OFFLINE)+"."; 
+  }
+  return true;  
 }
 
 void btnIniciarPopCallback(void *ptr) {
@@ -2363,27 +2367,10 @@ void btnIniciarPopCallback(void *ptr) {
     return;
   }
 
-  if(!validarComandasEmEspera()){
+  conectado = isConectado(); 
+  if(!conectado && !validarComandasEmEspera()){
     return;
   }
-
-//  if(!(numComandasOffline < MAX_COMANDAS_OFFLINE)){ 
-//    String msg = "Máx. de " + String(MAX_COMANDAS_OFFLINE) +" comandas sem internet atingido."; 
-//    txtMsg.setText(msg.c_str()); 
-//	txtPage0.setText(msg.c_str());     
-//    return; 
-//  } 
-   
-//  conectado = isConectado(); 
-//  if(!conectado){ 
-//    numComandasOffline++; 
-//    String msg = String(numComandasOffline) +" comandas sem internet. Limite: "+ String(MAX_COMANDAS_OFFLINE); 
-//	txtPage0.setText(msg.c_str()); 
-//  }else{ 
-//    numComandasOffline = 0; 
-//	txtPage0.setText(""); 
-//	txtMsg.setText(""); 
-//  }  
 
   if (procurarSenha(strSenha, BDPROFISSIONAIS)) {
     resetarPopupSenha();
@@ -2446,6 +2433,7 @@ void gotoPage0(){
   page0.show();
   picWifi.setPic(conectado?PIC_CONECTADO:PIC_DESCONECTADO);
   inPage0 = true;
+  txtPage0.setText(msgComandaEspera.c_str()); 
 }
 
 NexTouch *nex_listen_list[] = {
