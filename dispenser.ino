@@ -1326,7 +1326,6 @@ String criarMensagemJsonMapping() {
   doc["nomeUsuario"] = profissional;
   doc["numero"] = numeroComanda.toInt();
   doc["photoactive"] = photoactive;
-  doc["tipo"] = 2;
 
   RtcDateTime now = Rtc.GetDateTime();
   char data[11];
@@ -1337,13 +1336,16 @@ String criarMensagemJsonMapping() {
 
   switch (opcaoMapping) {
     case CURTO:
-      volume = 15;      
+      volume = 15;
+      doc["tipo"] = 2;      
       break;
     case MEDIO:
       volume = 24;
+      doc["tipo"] = 3;
       break;
     case LONGO:
       volume = 33;
+      doc["tipo"] = 4;
       break;
     case NENHUM:
       break;
@@ -1558,10 +1560,11 @@ bool isConectado(){
 //  bool conectado = wifiSerial.ping("8.8.8.8");
 //  return conectado;
 
-  if(redeConectada.length() > 0 && senhaConectada.length() > 0)
-    return wifiSerial.joinAP(redeConectada, senhaConectada);
-
-  return false;
+  //muito lento
+  //if(redeConectada.length() > 0 && senhaConectada.length() > 0)
+    //return wifiSerial.joinAP(redeConectada, senhaConectada);
+  String json = receberJson("/api/maquina/datetime/");
+  return json.length() > 0? true:false;
 }
 
 bool conectarWifi(String nomeRede, String senha, int tentativas) {
@@ -1603,10 +1606,6 @@ void iniciarWifi() {
   //}
 
   conectado = iniciarConectar();
-  
-  if(!conectado){
-    imprimirComandasEmEspera(contarComandasEmEspera());
-  }
           
   msgLoading.setText(conectado?"Conectado":"Desconectado");
 
@@ -2338,13 +2337,9 @@ void rodaMapping() {
 
 void imprimirComandasEmEspera(int emEspera){
   if(emEspera == 0){
-    msgComandaEspera = "";
-    return;
-  }
-  
-  if(emEspera > MAX_COMANDAS_OFFLINE){    
+    msgComandaEspera = "";    
+  }else if(emEspera >= MAX_COMANDAS_OFFLINE){    
     msgComandaEspera = "Max. de " + String(MAX_COMANDAS_OFFLINE) +" comandas em espera atingido."; 
-    txtMsg.setText(msgComandaEspera.c_str());
   }else{  
     msgComandaEspera = String(emEspera) +" comandas em espera. Limite: "+ String(MAX_COMANDAS_OFFLINE)+"."; 
   }
@@ -2374,14 +2369,11 @@ void btnIniciarPopCallback(void *ptr) {
     txtMsg.setText("Senha obrigatoria");
     return;
   }
-
-  conectado = isConectado(); 
-  if(!conectado){
-    int emEspera = contarComandasEmEspera()+1;//+1 para a comanda atual
-    imprimirComandasEmEspera(emEspera);
     
-    if(emEspera > MAX_COMANDAS_OFFLINE)
-      return;
+  if(contarComandasEmEspera() >= MAX_COMANDAS_OFFLINE){
+    String msg = "Max. de " + String(MAX_COMANDAS_OFFLINE) +" comandas em espera atingido."; 
+    txtMsg.setText(msg.c_str());
+    return;
   }
 
   if (procurarSenha(strSenha, BDPROFISSIONAIS)) {
@@ -2445,6 +2437,7 @@ void gotoPage0(){
   page0.show();
   picWifi.setPic(conectado?PIC_CONECTADO:PIC_DESCONECTADO);
   inPage0 = true;
+  imprimirComandasEmEspera(contarComandasEmEspera());
   txtPage0.setText(msgComandaEspera.c_str()); 
 }
 
@@ -2634,11 +2627,11 @@ void loop() {
   
   if(modoStatus){
     conectado = isConectado();
-	
+    
     if(conectado)
       enviarJson(criarMensagemJsonStatus(), "/api/maquina/sit/");
-
-    if(inPage0){
+      
+    if(inPage0){  
       picWifi.setPic(conectado?PIC_CONECTADO:PIC_DESCONECTADO);
     }
       
