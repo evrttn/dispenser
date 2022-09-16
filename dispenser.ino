@@ -1603,6 +1603,10 @@ void iniciarWifi() {
   //}
 
   conectado = iniciarConectar();
+  
+  if(!conectado){
+    imprimirComandasEmEspera(contarComandasEmEspera());
+  }
           
   msgLoading.setText(conectado?"Conectado":"Desconectado");
 
@@ -2332,19 +2336,23 @@ void rodaMapping() {
   gotoPage0();
 }
 
-
-bool validarComandasEmEspera(){
-  int emEspera = contarLinhas("tmp.txt");
+void imprimirComandasEmEspera(int emEspera){
+  if(emEspera == 0){
+    msgComandaEspera = "";
+    return;
+  }
   
-  if(emEspera >= MAX_COMANDAS_OFFLINE){    
-    String msg = "Max. de " + String(MAX_COMANDAS_OFFLINE) +" comandas em espera atingido."; 
-    txtMsg.setText(msg.c_str());
-    msgComandaEspera = msg;
-    return false;
-  }else{
+  if(emEspera > MAX_COMANDAS_OFFLINE){    
+    msgComandaEspera = "Max. de " + String(MAX_COMANDAS_OFFLINE) +" comandas em espera atingido."; 
+    txtMsg.setText(msgComandaEspera.c_str());
+  }else{  
     msgComandaEspera = String(emEspera) +" comandas em espera. Limite: "+ String(MAX_COMANDAS_OFFLINE)+"."; 
   }
-  return true;  
+}
+
+int contarComandasEmEspera(){
+  int n = contarLinhas("tmp.txt");
+  return n < 0 ? 0 : n;
 }
 
 void btnIniciarPopCallback(void *ptr) {
@@ -2368,8 +2376,12 @@ void btnIniciarPopCallback(void *ptr) {
   }
 
   conectado = isConectado(); 
-  if(!conectado && !validarComandasEmEspera()){
-    return;
+  if(!conectado){
+    int emEspera = contarComandasEmEspera()+1;//+1 para a comanda atual
+    imprimirComandasEmEspera(emEspera);
+    
+    if(emEspera > MAX_COMANDAS_OFFLINE)
+      return;
   }
 
   if (procurarSenha(strSenha, BDPROFISSIONAIS)) {
