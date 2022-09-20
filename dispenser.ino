@@ -1010,7 +1010,7 @@ String prepararDadosSdShampoo() {
   return msg;
 }
 
-String prepararDadosSdTratamento(unsigned long volumeBase, unsigned long volumeCondicionador[]) {
+String prepararDadosSdTratamento(double volumeBase, double volumeCondicionador[]) {
   RtcDateTime now = Rtc.GetDateTime();
 
   char data[12];
@@ -1032,7 +1032,7 @@ String prepararDadosSdTratamento(unsigned long volumeBase, unsigned long volumeC
       msg += fator[i];
       msg += ";";
       msg += "volume:";
-      msg += volumeCondicionador[i];
+      msg += String(volumeCondicionador[i],1);
     }
   }
 
@@ -1041,7 +1041,7 @@ String prepararDadosSdTratamento(unsigned long volumeBase, unsigned long volumeC
   msg += volumeTotal;
   msg += ";";
   msg += "volumeBase:";
-  msg += volumeBase;
+  msg += String(volumeBase,1);
   msg += ";";
   msg += "photo.:";
   msg += photoactive;
@@ -1072,9 +1072,11 @@ void lerDadosBasicos(){
     int idxSeparador = info.indexOf(":");
     codMaquina = info.substring(idxSeparador+1);
 
+    /*
     info = myFile.readStringUntil('\n');
     idxSeparador = info.indexOf(":");
     codSalao = info.substring(idxSeparador+1);
+    */
     
     myFile.close();
   } else {
@@ -1287,7 +1289,7 @@ String criarMensagemJsonShampoo() {
   return dados;
 }
 
-String criarMensagemJsonTratamento(unsigned long n, unsigned long volumeCondicionador[]) {
+String criarMensagemJsonTratamento(double volumeCondicionador[]) {
   StaticJsonDocument<240> doc;
   doc["codMaquina"] = codMaquina.toInt();
   doc["codUsuario"] = codUsuario.toInt();
@@ -1310,7 +1312,7 @@ String criarMensagemJsonTratamento(unsigned long n, unsigned long volumeCondicio
     if (condicionador[i]) {
       JsonObject objItems = items.createNestedObject();
       objItems["codProduto"] = j;
-      objItems["volume"] = volumeCondicionador[i];
+      objItems["volume"] = String(volumeCondicionador[i], 1);
       objItems["porcentagem"] = fator[i];
     }
   }
@@ -1396,7 +1398,7 @@ String receberJson(String uri){
   bool teste = wifiSerial.send(request.c_str(), request.length());
 
   char buffr[300] = {0};
-  uint32_t len = wifiSerial.recv(buffr, sizeof(buffr), 10000);
+  uint32_t len = wifiSerial.recv(buffr, sizeof(buffr), 5000);
 
   wifiSerial.releaseTCP();
   return String(buffr);
@@ -1410,6 +1412,9 @@ bool enviarJson(String data, String uri)
     Serial.print(F("create tcp err\r\n"));
     return false;
   } 
+
+  Serial.print("data: ");
+  Serial.println(data);
 
   String server = HOST_NAME + ":" + HOST_PORT;
   
@@ -2227,8 +2232,8 @@ void rodaShampoo() {
 }
 
 void rodaTratamento() {
-  unsigned long volumeCondicionador[7] = {0};
-  unsigned long somaVolumeCondicionador = 0;
+  double volumeCondicionador[7] = {0.0};
+  double somaVolumeCondicionador = 0.0;
   unsigned long tempoReleFechado[7] = {0};
 
   for (int i = 0; i < 7; i++) {
@@ -2239,7 +2244,7 @@ void rodaTratamento() {
     }
   }
 
-  unsigned long volumeBase = volumeTotal - somaVolumeCondicionador;
+  double volumeBase = volumeTotal - somaVolumeCondicionador;
 
   unsigned long tempoReleBaseFechado = (unsigned long)tempoValvulaBase * volumeBase;
 
@@ -2262,7 +2267,7 @@ void rodaTratamento() {
 
     gravarSD(prepararDadosSdTratamento(volumeBase, volumeCondicionador), "trat.txt");
     
-	  String dadosWifi = criarMensagemJsonTratamento(n, volumeCondicionador);
+	  String dadosWifi = criarMensagemJsonTratamento(volumeCondicionador);
     bool enviou = enviarJson(dadosWifi, "/api/comanda/adiciona/");
     
     if (enviou) {
