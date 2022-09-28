@@ -228,7 +228,7 @@ String senhaConectada = "";
 
 const int MAX_COMANDAS_OFFLINE = 5;
 
-String HOST_NAME = "teste.k08.com.br";
+String HOST_NAME = "www.k08.com.br";
 int HOST_PORT = 80;
 //=======================================
 String profissional = "";
@@ -2285,7 +2285,7 @@ void rodaMapping() {
 
   volumeTotal = 0;
   
-  int rele = RELE4_BIONEUTRAL;
+  
   
   switch (opcaoMapping) {
     case CURTO:
@@ -2302,26 +2302,21 @@ void rodaMapping() {
   }
   
   unsigned long volume = volumeTotal/3;
-  unsigned long volShampoo = (unsigned long)volume * K_valvula_11;
 
-  unsigned long fim = millis() + volShampoo;
-
-  page4.show();
-    digitalWrite (RELE8_PHOTOACTIVE, LOW);
-
-    digitalWrite (rele, LOW);
-    while (millis() < fim) {
-    }
-  digitalWrite (rele, HIGH);
-  delay(500);
-  
   unsigned long tempoT1 = volume * tempoValvulaCondicionador[0];
   unsigned long tempoT2 = volume * tempoValvulaCondicionador[1];
-
+  unsigned long tempoT5 = volume * tempoValvulaCondicionador[4];
+  
+  page4.show();
+  digitalWrite (RELE8_PHOTOACTIVE, LOW);
+  
   liberarCondicionador(RELE16_NUTRI, tempoT1); // 
   delay(500);
   liberarCondicionador(RELE15_REPAIR, tempoT2); // 
   delay(500);  
+  liberarCondicionador(RELE12_ANTIBREAK, tempoT5); // 
+  delay(500);
+    
   digitalWrite (RELE8_PHOTOACTIVE, HIGH);
   page5.show();//retire seu produto
 
