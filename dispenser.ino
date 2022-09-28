@@ -228,7 +228,7 @@ String senhaConectada = "";
 
 const int MAX_COMANDAS_OFFLINE = 5;
 
-String HOST_NAME = "teste.k08.com.br";
+String HOST_NAME = "www.k08.com.br";
 int HOST_PORT = 80;
 //=======================================
 String profissional = "";
@@ -2297,6 +2297,8 @@ void rodaTratamento() {
 void rodaMapping() {
 
   volumeTotal = 0;  
+  
+  
   
   switch (opcaoMapping) {
     case CURTO:
