@@ -1119,8 +1119,10 @@ bool iniciarConectar() {
   pt = strtok(buff, "+");
   while (pt && i < 10) {
     String r = getNomeRede(pt);
-    if (r.length() > 0)
-      redes[i++] = r.substring(0, r.indexOf('\r')); 
+    if (r.length() > 0){
+		int idx = r.indexOf("\r")  > 0 ? r.indexOf("\r"):r.indexOf("\n");
+      redes[i++] = r.substring(0, idx); 
+	}
     pt = strtok(NULL, "+");
   }
   
@@ -1140,9 +1142,16 @@ bool iniciarConectar() {
       String redeNome = arquivo.readStringUntil('\n');      
       String redeSenha = arquivo.readStringUntil('\n');
 
+      int idx = redeNome.indexOf("\r");
+	  if(idx > 0)
+		  redeNome = redeNome.substring(0, idx);
+	  
+	  idx = redeSenha.indexOf("\r");
+	  if(idx > 0)
+		  redeSenha = redeSenha.substring(0, idx);
+
       for(int j = 0; j < i; j++){       
-        if (redes[j].equals(redeNome)) {
-          
+        if (redes[j].equals(redeNome)) {          
           msg = "Conectando na rede "+redeNome+"...";
           msgLoading.setText(msg.c_str());
           conectou = conectarWifi(redeNome, redeSenha, TENTATIVAS_CONEXAO);
@@ -1679,8 +1688,12 @@ void btnConectarPushCallback(void *ptr) {
   }
 
   txtConexao.setText("Conectando...");
-  String n = nomeRede.substring(0, nomeRede.indexOf("\r")); //nextion coloca \r no final da string
-  String s = senha.substring(0, senha.indexOf("\r"));
+  
+  int idx = nomeRede.indexOf("\r") > 0 ? nomeRede.indexOf("\r"):nomeRede.indexOf("\n");
+  
+  String n = nomeRede.substring(0, idx); //nextion coloca \r no final da string
+  idx = senha.indexOf("\r") > 0 ? senha.indexOf("\r"):senha.indexOf("\n");
+  String s = senha.substring(0, idx);
   conectado = conectarWifi(n, s, TENTATIVAS_CONEXAO);
   
   if (conectado) {
@@ -2283,9 +2296,7 @@ void rodaTratamento() {
 
 void rodaMapping() {
 
-  volumeTotal = 0;
-  
-  int rele = RELE4_BIONEUTRAL;
+  volumeTotal = 0;  
   
   switch (opcaoMapping) {
     case CURTO:
@@ -2302,26 +2313,21 @@ void rodaMapping() {
   }
   
   unsigned long volume = volumeTotal/3;
-  unsigned long volShampoo = (unsigned long)volume * K_valvula_11;
 
-  unsigned long fim = millis() + volShampoo;
-
-  page4.show();
-    digitalWrite (RELE8_PHOTOACTIVE, LOW);
-
-    digitalWrite (rele, LOW);
-    while (millis() < fim) {
-    }
-  digitalWrite (rele, HIGH);
-  delay(500);
-  
   unsigned long tempoT1 = volume * tempoValvulaCondicionador[0];
   unsigned long tempoT2 = volume * tempoValvulaCondicionador[1];
-
+  unsigned long tempoT5 = volume * tempoValvulaCondicionador[4];
+  
+  page4.show();
+  digitalWrite (RELE8_PHOTOACTIVE, LOW);
+  
   liberarCondicionador(RELE16_NUTRI, tempoT1); // 
   delay(500);
   liberarCondicionador(RELE15_REPAIR, tempoT2); // 
   delay(500);  
+  liberarCondicionador(RELE12_ANTIBREAK, tempoT5); // 
+  delay(500);
+    
   digitalWrite (RELE8_PHOTOACTIVE, HIGH);
   page5.show();//retire seu produto
 
