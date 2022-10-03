@@ -10,7 +10,7 @@
 #include <UnixTime.h>
 
 UnixTime stamp(-3);
-ESP8266 wifiSerial(Serial1, 115200);
+ESP8266 wifiSerial(Serial1, 9600);
 
 #define SS 53
 
@@ -1578,7 +1578,7 @@ bool isConectado(){
   //if(redeConectada.length() > 0 && senhaConectada.length() > 0)
     //return wifiSerial.joinAP(redeConectada, senhaConectada);
   String json = receberJson("/api/maquina/datetime/");
-  return json.length() > 0? true:false;
+  return json.length() > 30? true:false;
 }
 
 bool conectarWifi(String nomeRede, String senha, int tentativas) {
@@ -1665,6 +1665,10 @@ bool reenviarDadosTemporarios() {
 
 void btnConectarPushCallback(void *ptr) {
   desconectarWifi(); //desconecta da ultima rede conectado
+
+  if(!wifiSerial.kick()){
+    wifiSerial.restart();
+  }
  
   char buff1[31] = {0};
   comboRede.getText(buff1, sizeof(buff1));
@@ -1694,6 +1698,12 @@ void btnConectarPushCallback(void *ptr) {
   String n = nomeRede.substring(0, idx); //nextion coloca \r no final da string
   idx = senha.indexOf("\r") > 0 ? senha.indexOf("\r"):senha.indexOf("\n");
   String s = senha.substring(0, idx);
+
+  Serial.print("size do nome e da senha: ");
+  Serial.print(n.length());
+  Serial.print(" ");
+  Serial.println(s.length());
+  
   conectado = conectarWifi(n, s, TENTATIVAS_CONEXAO);
   
   if (conectado) {
@@ -1882,7 +1892,7 @@ void buscarRedesDisponiveis() {
   pt = strtok(buff, "+");
   while (pt) {
     String r = getNomeRede(pt);
-    Serial.println(r);
+    Serial.print(r);
     if (r.length() > 0)
       redes += r;
     pt = strtok(NULL, "+");
